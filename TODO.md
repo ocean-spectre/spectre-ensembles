@@ -1,0 +1,2 @@
+- [] Customize build script for this new setup
+- [] Setup yaml schema for controlling simulation sequences and ensemble directory setup

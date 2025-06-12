@@ -1,0 +1,35 @@
+#
+#
+# Build options for Derecho at NCAR
+#
+
+FC=ftn
+CC=cc
+MPI_INC_DIR="$CRAY_MPICH_DIR/include"
+DEFINES='-DALLOW_USE_MPI -DALWAYS_USE_MPI -DWORDLENGTH=4 -DNML_TERMINATOR'
+CPP='cpp -P -traditional'
+EXTENDED_SRC_FLAG='-132'
+NOOPTFLAGS='-O2'
+
+if test "x$DEVEL" != x ; then
+    FFLAGS="$FFLAGS  -W0 -WB -convert big_endian -assume byterecl -fPIC -O0 -g -noalign -fpstkchk -check all -fpe0 -traceback -ftrapuv -fpmodel except -warn all -march=core-avx2"
+else
+    FFLAGS="$FFLAGS  -W0 -WB -convert big_endian -assume byterecl -fPIC -g"
+fi
+
+if test "x$IEEE" = x ; then
+        FOPTIM='-O3 -align'
+else
+        FOPTIM='-O2 -align -mp'
+fi
+CFLAGS='-O3 -fPIC'
+
+
+#INCLUDEDIRS="${INCLUDEDIRS} ${NCAR_INC_NETCDF} ${NCAR_INC_HDF5}"
+#INCLUDES="${INCLUDES} -I${NCAR_INC_NETCDF} -I${NCAR_INC_HDF5} -I${NCAR_ROOT_HDF5}/mod/shared"
+#LIBS="${LIBS} -L${NCAR_LDFLAGS_HDF5}  -L${NCAR_LDFLAGS_NETCDF64} -L${NCAR_LDFLAGS_NETCDF} -lnetcdff -lhdf5_hl -lhdf5 -lm -lz -lzstd -lbz2 -lcurl -lxml2"
+#LIBDIR="${LIBDIR} ${NCAR_LDFLAGS_HDF5} ${NCAR_LDFLAGS_NETCDF} ${NCAR_LDFLAGS_NETCDF64}"
+
+INCLUDES="$INCLUDES -I$MPI_INC_DIR"
+INCLUDEDIRS="$INCLUDEDIRS $MPI_INC_DIR"
+MPIINCLUDEDIR="$MPI_INC_DIR"

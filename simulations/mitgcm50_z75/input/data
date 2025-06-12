@@ -1,0 +1,77 @@
+# ====================
+# | Model parameters |
+# ====================
+#
+# Continuous equation parameters
+ &PARM01
+ viscAh=1.0,
+ diffKhT=1.0,
+ diffKhS=1.0,
+ viscAz=1.E-5,
+ viscA4=7.9E7,
+ bottomDragLinear=0.0,
+ bottomDragQuadratic=2.0E-3,
+ no_slip_sides=.FALSE.,
+ no_slip_bottom=.FALSE.,
+ diffKzT=1.0E-5,
+ diffK4T=7.9E7,
+ diffK4S=7.9E7,
+ diffKzS=1.0E-5,
+ implicitViscosity=.TRUE.,
+ implicitDiffusion=.TRUE.,
+ eosType='MDJWF',
+ rigidLid=.FALSE.,
+ implicitFreeSurface=.TRUE.,
+ hFacMin=0.4,
+ nonHydrostatic=.FALSE.,
+ readBinaryPrec=32,
+ useSingleCPUIO=.TRUE.,
+ staggerTimeStep=.TRUE.,
+ balanceEmPmR=.TRUE.,
+ saltAdvScheme=33,
+ tempAdvScheme=33,
+ &end
+# Elliptic solver parameters
+ &PARM02
+ cg2dMaxIters=1000,
+ cg2dTargetResidual=1.E-13,
+ cg3dMaxIters=20,
+ cg3dTargetResidual=1.E-8,
+ &end
+# Time stepping parameters
+ &PARM03
+ nIter0=0,
+ baseTime=172800.0,
+# End at end of day 365
+ endTime=31536000.0,
+ deltaT=120.0,
+ abEps=0.01,
+ pChkptFreq=864000.0, 
+ chkptFreq=864000.0,
+ dumpFreq=86400.0,
+ monitorSelect=2,
+ monitorFreq=3600.0,
+ periodicExternalForcing=.TRUE.,
+# Daily forced
+ externForcingPeriod=86400.0,
+# 365 day year
+ externForcingCycle=31536000.0,
+ &end
+# Gridding parameters
+ &PARM04
+ usingCartesianGrid=.FALSE.,
+ usingSphericalPolarGrid=.TRUE.,
+ ygOrigin=27.9947,
+ delXFile='dx.bin',
+ delYFile='dy.bin',
+ delRFile='dz.bin',
+ &end
+# Input datasets
+ &PARM05
+ bathyFile='gebco_smoothed_topog_pave20m.bin',
+ hydrogThetaFile='t.spinup-03.bin',
+ pSurfInitFile='eta.spinup-03.bin',
+ hydrogSaltFile='s.spinup-03.bin',
+ uVelInitFile='u.spinup-03.bin',
+ vVelInitFile='v.spinup-03.bin',
+ &end

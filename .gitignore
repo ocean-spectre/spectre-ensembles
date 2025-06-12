@@ -1,0 +1,10 @@
+*.data
+*.meta
+*.bin
+*.box
+*.nc
+mitgcmuv
+*.o*
+*.e*
+build/
+exe/
