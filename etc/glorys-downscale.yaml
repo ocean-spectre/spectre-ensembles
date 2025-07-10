@@ -1,0 +1,19 @@
+name: spectre-glorysv12-downscale
+description: |
+  Glorys v12 downscaled to 1/48 degree resolution for the years 2003-2015
+
+dataset_prefix: "glorysv12"
+working_directory: /scratch/joe/spectre-150-ensembles/glorys-downscale
+refine_factor: 4
+dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+domain:
+  longitude:
+    min: -82.0
+    max: -22.0
+  latitude:
+    min: 26.0
+    max: 53.0
+  time:
+    start: "2003-01-01"
+    end: "2015-12-31"
+
