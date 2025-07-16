@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spectre_utils"
+version = "0.0.1"
+authors = [
+  { name="Joe Schoonover", email="joe@fluidnumerics.com" },
+]
+description = "Tools for computing spectra of fluids in irregular geometry"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: Other",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "xgcm",
+  "xarray",
+  "zarr==3.0.8"
+]
+[project.urls]
+Homepage = "https://github.com/ocean-spectre/spectra-150-ensembles"
+Issues = "https://github.com/fluidnumerics/spectre_utils/issues"
+
+[tool.setuptools]
+packages = ["spectre_utils"]
