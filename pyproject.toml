@@ -22,7 +22,8 @@ dependencies = [
   "matplotlib",
   "xgcm",
   "xarray",
-  "zarr==3.0.8"
+  "zarr==3.0.8",
+  "cartopy==0.24.1",
 ]
 [project.urls]
 Homepage = "https://github.com/ocean-spectre/spectra-150-ensembles"

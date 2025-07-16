@@ -2,23 +2,30 @@ name: spectre-glorysv12
 description: |
   Glorys v12 on 1/12 degree resolution for the years 2003-2015. This conifguration is mainly used for model to model adapation (NEMO to MITgcm)
 
-dataset_prefix: "glorysv12"
 working_directory: /group/tdgs/joe/spectre-150-ensembles/glorysv12
 refine_factor: 1
 
 statics:
   dataset_id: "cmems_mod_glo_phy_my_0.083deg_static"
-  items: ["bathy","coords"]
+  variables: ["mask","deptho","deptho_lev"]
+  prefix: "glorysv12_static"
+ocean:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+  variables: ["thetao","so","uo","vo","zos"]
+  prefix: "glorysv12"
+atmosphere:
+  dataset_url: "https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5"
+  dataset_id: ""
+  variables: []
+  cheapaml: True
 
-
-dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
 domain:
   longitude:
     min: -82.0
     max: -17.916666667
   latitude:
     min: 26.0
-    max: 53.0
+    max: 52.75
   depth:
     min: 0.0
     max: 10000.0
@@ -26,15 +33,19 @@ domain:
     start: "2002-07-01"
     end: "2015-07-01"
 
+simulation:
+  jobs:
+    flags:
+      - "--select=2:ncpus=64:mpiprocs=64:mem=256GB"
+      - "--time=8:00:00"
+      - "--queue=economy"
+    model_years_per_job: 1.0
 
-spinup:
-  start: "2002-07-01"
-  end: "2003-07-01"
-  repeat_years: 5
+  spinup:
+    start: "2002-07-01"
+    end: "2003-07-01"
+    repeat_years: 5
 
-atmosphere:
-  dataset_url: "https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5"
-  dataset_id: ""
-  variables: 
+
   
 
