@@ -69,6 +69,34 @@ def plot_zbot(ds, working_directory='.'):
     plt.title('Bottom cell layer')
     plt.savefig(os.path.join(working_directory, 'zbot.png'))
 
+def plot_boundary_cross_sections(ds, grid, working_directory='.'):
+    """Plot boundary cross sections from the dataset."""
+    import matplotlib.pyplot as plt
+
+    def plot_cross_section(data,xlabel,title,filename):
+        fig, ax = plt.subplots(1,1, figsize=(10, 6))
+        pcm = data.plot(ax=ax, shading='auto', cmap='viridis')
+        plt.gca().invert_yaxis()
+        #plt.colorbar(pcm, label="mask")
+        plt.xlabel(xlabel)
+        plt.ylabel('Depth (m)')
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(filename)
+
+    data = ds['mask']
+
+    # Define each boundary
+    north = data.sel(yc=ds.yc.max(), method='nearest')  # constant yc
+    south = data.sel(yc=ds.yc.min(), method='nearest')  # constant yc
+    east  = data.sel(xc=ds.xc.max(), method='nearest')  # constant xc
+    west  = data.sel(xc=ds.xc.min(), method='nearest')  # constant xc
+    plot_cross_section(north, 'Longitude', 'North Boundary Cross Section', os.path.join(working_directory, 'north_boundary_cross_section.png'))
+    plot_cross_section(south, 'Longitude', 'South Boundary Cross Section', os.path.join(working_directory, 'south_boundary_cross_section.png'))
+    plot_cross_section(east, 'Latitude', 'East Boundary Cross Section', os.path.join(working_directory, 'east_boundary_cross_section.png'))
+    plot_cross_section(west, 'Latitude', 'West Boundary Cross Section', os.path.join(working_directory, 'west_boundary_cross_section.png'))
+
+
 def get_initial_conditions(config):
     # Get time range from configuration
     time_range = config.get('domain').get('time')
@@ -191,12 +219,45 @@ def main():
         'T': {'center': 'time'}
     })
 
-    # print(U.shape, V.shape, T.shape, S.shape, Eta.shape)
     print(ds_interp)
     plot_mask(ds_interp, working_directory=config.get('working_directory', '.'))
     plot_bathy(ds_interp, working_directory=config.get('working_directory', '.'))
     plot_zbot(ds_interp, working_directory=config.get('working_directory', '.'))
-    plot_surface_fields(ds_interp, grid, working_directory=config.get('working_directory', '.'))
+    plot_surface_fields(ds_interp, grid_interp, working_directory=config.get('working_directory', '.'))
+    plot_boundary_cross_sections(ds_interp, grid_interp, working_directory=config.get('working_directory', '.'))
+
+    # Write each component to a big-endian single precision binary file
+    simulation_input_dir = os.path.join(config.get('simulation_directory', '.'), 'input')
+    if not os.path.exists(simulation_input_dir):
+        os.makedirs(simulation_input_dir)
+    with open(os.path.join(simulation_input_dir, 'U.init.bin'), 'wb') as f:
+        ds_interp['U'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'V.init.bin'), 'wb') as f:
+        ds_interp['V'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'T.init.bin'), 'wb') as f:
+        ds_interp['T'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'S.init.bin'), 'wb') as f:
+        ds_interp['S'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'Eta.init.bin'), 'wb') as f:
+        ds_interp['Eta'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'mask.bin'), 'wb') as f:
+        ds_interp['mask'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'zbot.bin'), 'wb') as f:
+        ds_interp['zbot'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'bathy.bin'), 'wb') as f:
+        ds_interp['bathy'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'xc.bin'), 'wb') as f:
+        ds_interp['xc'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'yc.bin'), 'wb') as f:
+        ds_interp['yc'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'zc.bin'), 'wb') as f:
+        ds_interp['zc'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'xg.bin'), 'wb') as f:
+        ds_interp['xg'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'yg.bin'), 'wb') as f:
+        ds_interp['yg'].values.astype('>f4').tofile(f)
+
+
 
 if __name__ == "__main__":
     main()
