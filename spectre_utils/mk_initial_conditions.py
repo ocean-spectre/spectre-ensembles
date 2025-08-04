@@ -1,6 +1,7 @@
 import yaml
 import os
 import xarray as xr
+import numpy as np
 from spectre_utils import common
 import xgcm
 
@@ -36,6 +37,25 @@ def plot_mask(ds, working_directory='.'):
     #ax.coastlines()
     plt.title('Mask')
     plt.savefig(os.path.join(working_directory, 'mask.png'))
+
+def plot_where_nan(ds, working_directory='.'):
+    """Plot the mask from the dataset."""
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
+    # Create a mask where the data is NaN as integers
+    nan_mask = ds['zos'].fillna(-1000)
+    p = nan_mask[0,:,:].plot(ax=ax, transform=ccrs.PlateCarree(), cmap='viridis', x='xc', y='yc')
+    # show lat/lon grid
+    gl = p.axes.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                        linewidth=0.5, color='gray', alpha=0.7, linestyle='--')
+    gl.xlabels_top = False # Hide longitude labels at the top
+    gl.ylabels_right = False # Hide latitude labels on the right
+
+    #ax.coastlines()
+    plt.title('Mask')
+    plt.savefig(os.path.join(working_directory, 'nan_mask_T.png'))
 
 def plot_bathy(ds, working_directory='.'):
     """Plot the bathymetry from the dataset."""
@@ -184,6 +204,23 @@ def main():
     ds, grid = get_initial_conditions(config)
     ds_static, grid_static = get_statics(config)
 
+    if ds.isnull().any():
+        print("Warning: Input dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds['uo'] = ds['uo'].fillna(0)
+        ds['vo'] = ds['vo'].fillna(0)
+        ds['thetao'] = ds['thetao'].fillna(0)
+        ds['so'] = ds['so'].fillna(0)
+        ds['zos'] = ds['zos'].fillna(0)
+        print(ds.isnull().sum())
+
+    if ds_static.isnull().any():
+        print("Warning: Input statics dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds_static['deptho'] = ds_static['deptho'].fillna(0)
+        ds_static['deptho_lev' ] = ds_static['deptho_lev'].fillna(0)
+        print(ds_static.isnull().sum())
+
     # Now, we need to interpolate to the c-grid locations
     U = grid.interp(ds['uo'],axis='X')[...,1:-1,1:-1]
     V = grid.interp(ds['vo'],axis='Y')[...,1:-1,1:-1]
@@ -220,6 +257,11 @@ def main():
     })
 
     print(ds_interp)
+    # Check if there are any NaN values in the dataset
+    if ds_interp.isnull().any():
+        print("Warning: The dataset contains NaN values. This may cause issues in the simulation.")
+        print(ds_interp.isnull().sum())
+
     plot_mask(ds_interp, working_directory=config.get('working_directory', '.'))
     plot_bathy(ds_interp, working_directory=config.get('working_directory', '.'))
     plot_zbot(ds_interp, working_directory=config.get('working_directory', '.'))
