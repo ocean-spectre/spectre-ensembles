@@ -3,6 +3,7 @@ description: |
   Glorys v12 on 1/12 degree resolution for the years 2003-2015. This conifguration is mainly used for model to model adapation (NEMO to MITgcm)
 
 working_directory: /group/tdgs/joe/spectre-150-ensembles/glorysv12
+simulation_directory: /group/tdgs/joe/spectre-150-ensembles/simulations/glorysv12
 refine_factor: 1
 
 statics:
@@ -23,15 +24,18 @@ domain:
   longitude:
     min: -82.0
     max: -17.916666667
+    dx: 0.083333333
   latitude:
     min: 26.0
     max: 52.75
+    dy: 0.083333333
   depth:
     min: 0.0
     max: 10000.0
   time:
     start: "2002-07-01"
-    end: "2015-07-01"
+    end: "2003-07-01"
+    #end: "2015-07-01"
 
 simulation:
   jobs:
