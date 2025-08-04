@@ -199,9 +199,18 @@ def main():
         config = yaml.safe_load(f)
     
     bcs = get_boundary_conditions(config)
-    # ds_static, grid_static = get_statics(config)
+    
+    simulation_input_dir = os.path.join(config.get('simulation_directory', '.'), 'input')
+    if not os.path.exists(simulation_input_dir):
+        os.makedirs(simulation_input_dir)
 
+    ###############################################################################
+    # South boundary conditions
+    ###############################################################################
     ds, grid = bcs['south']
+    print("Processing South boundary conditions...")
+    print("=========================================================")
+
     if ds.isnull().any():
         print("Warning: Input dataset contains NaN values. Patching values...")
         #Check if mask is identical to the locations where nan's are found
@@ -211,7 +220,7 @@ def main():
         ds['so'] = ds['so'].fillna(0)
         ds['zos'] = ds['zos'].fillna(0)
         print(ds.isnull().sum())
-        
+
     # Now, we need to interpolate to the c-grid locations
     U = grid.interp(ds['uo'],axis='X')[...,1,1:-1]
     V = grid.interp(ds['vo'],axis='Y')[...,1,1:-1]
@@ -244,13 +253,202 @@ def main():
         'T': {'center': 'time'}
     })
 
-    # # # print(U.shape, V.shape, T.shape, S.shape, Eta.shape)
-    print(ds_interp)
-    # plot_mask(ds_interp, working_directory=config.get('working_directory', '.'))
-    # plot_bathy(ds_interp, working_directory=config.get('working_directory', '.'))
-    # plot_zbot(ds_interp, working_directory=config.get('working_directory', '.'))
-    # plot_surface_fields(ds_interp, grid_interp, working_directory=config.get('working_directory', '.'))
-    # plot_boundary_cross_sections(ds_interp, grid_interp, working_directory=config.get('working_directory', '.'))
+
+    with open(os.path.join(simulation_input_dir, 'U.south.bin'), 'wb') as f:
+        ds_interp['U'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'V.south.bin'), 'wb') as f:
+        ds_interp['V'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'T.south.bin'), 'wb') as f:
+        ds_interp['T'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'S.south.bin'), 'wb') as f:
+        ds_interp['S'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'Eta.south.bin'), 'wb') as f:
+        ds_interp['Eta'].values.astype('>f4').tofile(f)
+    print("=========================================================")
+
+    ###############################################################################
+    # North boundary conditions
+    ###############################################################################
+    ds, grid = bcs['north']
+    print("Processing North boundary conditions...")
+    print("=========================================================")
+    if ds.isnull().any():
+        print("Warning: Input dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds['uo'] = ds['uo'].fillna(0)
+        ds['vo'] = ds['vo'].fillna(0)
+        ds['thetao'] = ds['thetao'].fillna(0)
+        ds['so'] = ds['so'].fillna(0)
+        ds['zos'] = ds['zos'].fillna(0)
+        print(ds.isnull().sum())
+
+    # Now, we need to interpolate to the c-grid locations
+    U = grid.interp(ds['uo'],axis='X')[...,-1,1:-1]
+    V = grid.interp(ds['vo'],axis='Y')[...,-1,1:-1]
+    T = ds['thetao'][...,-1,1:-1]
+    S = ds['so'][...,-1,1:-1]
+    Eta = ds['zos'][...,-1,1:-1]
+
+    print(f"min(XG) : {ds['xg'][1:-1].min().values}, max(XG) : {ds['xg'][1:-1].max().values}")
+    print(f"min(XC) : {ds['xc'][1:-1].min().values}, max(XC) : {ds['xc'][1:-1].max().values}")
+    print(f"min(YG) : {ds['yg'][1:-1].min().values}, max(YG) : {ds['yg'][1:-1].max().values}")
+    print(f"min(YC) : {ds['yc'][1:-1].min().values}, max(YC) : {ds['yc'][1:-1].max().values}")
+
+    print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
+    # create new dataset with interpolated variables
+    ds_interp = xr.Dataset({
+        'U': (['time', 'zc', 'xg'], U.values),
+        'V': (['time', 'zc', 'xc'], V.values),
+        'T': (['time', 'zc', 'xc'], T.values),
+        'S': (['time', 'zc', 'xc'], S.values),
+        'Eta': (['time', 'xc'], Eta.values),
+    }, coords={
+        'time': ds['time'],
+        'zc': ds['zc'],
+        'xc': ds['xc'][1:-1],
+        'xg': ds['xg'][1:-1],
+    })
+    grid_interp = xgcm.Grid(ds_interp, coords={
+        'X': {'center': 'xc', 'left': 'xg'},
+        'Z': {'center': 'zc'},
+        'T': {'center': 'time'}
+    })
+
+    with open(os.path.join(simulation_input_dir, 'U.north.bin'), 'wb') as f:
+        ds_interp['U'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'V.north.bin'), 'wb') as f:
+        ds_interp['V'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'T.north.bin'), 'wb') as f:
+        ds_interp['T'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'S.north.bin'), 'wb') as f:
+        ds_interp['S'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'Eta.north.bin'), 'wb') as f:
+        ds_interp['Eta'].values.astype('>f4').tofile(f)
+
+    print("=========================================================")
+
+    ###############################################################################
+    # West boundary conditions
+    ###############################################################################
+    ds, grid = bcs['west']
+    print("Processing West boundary conditions...")
+    print("=========================================================")
+    if ds.isnull().any():
+        print("Warning: Input dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds['uo'] = ds['uo'].fillna(0)
+        ds['vo'] = ds['vo'].fillna(0)
+        ds['thetao'] = ds['thetao'].fillna(0)
+        ds['so'] = ds['so'].fillna(0)
+        ds['zos'] = ds['zos'].fillna(0)
+        print(ds.isnull().sum())
+
+    # Now, we need to interpolate to the c-grid locations
+    U = grid.interp(ds['uo'],axis='X')[...,1:-1,1]
+    V = grid.interp(ds['vo'],axis='Y')[...,1:-1,1]
+    T = ds['thetao'][...,1:-1,1]
+    S = ds['so'][...,1:-1,1]
+    Eta = ds['zos'][...,1:-1,1]
+
+    print(f"min(XG) : {ds['xg'][1:-1].min().values}, max(XG) : {ds['xg'][1:-1].max().values}")
+    print(f"min(XC) : {ds['xc'][1:-1].min().values}, max(XC) : {ds['xc'][1:-1].max().values}")
+    print(f"min(YG) : {ds['yg'][1:-1].min().values}, max(YG) : {ds['yg'][1:-1].max().values}")
+    print(f"min(YC) : {ds['yc'][1:-1].min().values}, max(YC) : {ds['yc'][1:-1].max().values}")
+
+    print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
+    # create new dataset with interpolated variables
+    ds_interp = xr.Dataset({
+        'U': (['time', 'zc', 'xg'], U.values),
+        'V': (['time', 'zc', 'xc'], V.values),
+        'T': (['time', 'zc', 'xc'], T.values),
+        'S': (['time', 'zc', 'xc'], S.values),
+        'Eta': (['time', 'xc'], Eta.values),
+    }, coords={
+        'time': ds['time'],
+        'zc': ds['zc'],
+        'xc': ds['xc'][1:-1],
+        'xg': ds['xg'][1:-1],
+    })
+    grid_interp = xgcm.Grid(ds_interp, coords={
+        'X': {'center': 'xc', 'left': 'xg'},
+        'Z': {'center': 'zc'},
+        'T': {'center': 'time'}
+    })
+
+    with open(os.path.join(simulation_input_dir, 'U.west.bin'), 'wb') as f:
+        ds_interp['U'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'V.west.bin'), 'wb') as f:
+        ds_interp['V'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'T.west.bin'), 'wb') as f:
+        ds_interp['T'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'S.west.bin'), 'wb') as f:
+        ds_interp['S'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'Eta.west.bin'), 'wb') as f:
+        ds_interp['Eta'].values.astype('>f4').tofile(f)
+
+    print("=========================================================")
+
+        ###############################################################################
+    # West boundary conditions
+    ###############################################################################
+    ds, grid = bcs['west']
+    print("Processing West boundary conditions...")
+    print("=========================================================")
+    if ds.isnull().any():
+        print("Warning: Input dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds['uo'] = ds['uo'].fillna(0)
+        ds['vo'] = ds['vo'].fillna(0)
+        ds['thetao'] = ds['thetao'].fillna(0)
+        ds['so'] = ds['so'].fillna(0)
+        ds['zos'] = ds['zos'].fillna(0)
+        print(ds.isnull().sum())
+
+    # Now, we need to interpolate to the c-grid locations
+    U = grid.interp(ds['uo'],axis='X')[...,1:-1,-1]
+    V = grid.interp(ds['vo'],axis='Y')[...,1:-1,-1]
+    T = ds['thetao'][...,1:-1,-1]
+    S = ds['so'][...,1:-1,-1]
+    Eta = ds['zos'][...,1:-1,-1]
+
+    print(f"min(XG) : {ds['xg'][1:-1].min().values}, max(XG) : {ds['xg'][1:-1].max().values}")
+    print(f"min(XC) : {ds['xc'][1:-1].min().values}, max(XC) : {ds['xc'][1:-1].max().values}")
+    print(f"min(YG) : {ds['yg'][1:-1].min().values}, max(YG) : {ds['yg'][1:-1].max().values}")
+    print(f"min(YC) : {ds['yc'][1:-1].min().values}, max(YC) : {ds['yc'][1:-1].max().values}")
+
+    print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
+    # create new dataset with interpolated variables
+    ds_interp = xr.Dataset({
+        'U': (['time', 'zc', 'xg'], U.values),
+        'V': (['time', 'zc', 'xc'], V.values),
+        'T': (['time', 'zc', 'xc'], T.values),
+        'S': (['time', 'zc', 'xc'], S.values),
+        'Eta': (['time', 'xc'], Eta.values),
+    }, coords={
+        'time': ds['time'],
+        'zc': ds['zc'],
+        'xc': ds['xc'][1:-1],
+        'xg': ds['xg'][1:-1],
+    })
+    grid_interp = xgcm.Grid(ds_interp, coords={
+        'X': {'center': 'xc', 'left': 'xg'},
+        'Z': {'center': 'zc'},
+        'T': {'center': 'time'}
+    })
+
+    with open(os.path.join(simulation_input_dir, 'U.east.bin'), 'wb') as f:
+        ds_interp['U'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'V.east.bin'), 'wb') as f:
+        ds_interp['V'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'T.east.bin'), 'wb') as f:
+        ds_interp['T'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'S.east.bin'), 'wb') as f:
+        ds_interp['S'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'Eta.east.bin'), 'wb') as f:
+        ds_interp['Eta'].values.astype('>f4').tofile(f)
+
+    print("=========================================================")
+
 
 if __name__ == "__main__":
     main()
