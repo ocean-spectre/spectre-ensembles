@@ -201,40 +201,51 @@ def main():
     bcs = get_boundary_conditions(config)
     # ds_static, grid_static = get_statics(config)
 
-    # # Now, we need to interpolate to the c-grid locations
-    # U = grid.interp(ds['uo'],axis='X')#[...,1:-1,1:-1]
-    # V = grid.interp(ds['vo'],axis='Y')#[...,1:-1,1:-1]
-    # T = ds['thetao']#[...,1:-1,1:-1]
-    # S = ds['so']#[...,1:-1,1:-1]
-    # Eta = ds['zos']#[...,1:-1,1:-1]
+    ds, grid = bcs['south']
+    if ds.isnull().any():
+        print("Warning: Input dataset contains NaN values. Patching values...")
+        #Check if mask is identical to the locations where nan's are found
+        ds['uo'] = ds['uo'].fillna(0)
+        ds['vo'] = ds['vo'].fillna(0)
+        ds['thetao'] = ds['thetao'].fillna(0)
+        ds['so'] = ds['so'].fillna(0)
+        ds['zos'] = ds['zos'].fillna(0)
+        print(ds.isnull().sum())
+        
+    # Now, we need to interpolate to the c-grid locations
+    U = grid.interp(ds['uo'],axis='X')[...,1,1:-1]
+    V = grid.interp(ds['vo'],axis='Y')[...,1,1:-1]
+    T = ds['thetao'][...,1,1:-1]
+    S = ds['so'][...,1,1:-1]
+    Eta = ds['zos'][...,1,1:-1]
 
-    # # create new dataset with interpolated variables
-    # ds_interp = xr.Dataset({
-    #     'U': (['time', 'zc', 'yc', 'xg'], U.values),
-    #     'V': (['time', 'zc', 'yg', 'xc'], V.values),
-    #     'T': (['time', 'zc', 'yc', 'xc'], T.values),
-    #     'S': (['time', 'zc', 'yc', 'xc'], S.values),
-    #     'Eta': (['time', 'yc', 'xc'], Eta.values),
-    #     'mask': (['zc', 'yc', 'xc'], mask.values),
-    #     'zbot': (['yc', 'xc'], zbot.values),
-    #     'bathy': (['yc', 'xc'], bathy.values)
-    # }, coords={
-    #     'time': ds['time'],
-    #     'zc': ds['zc'],
-    #     'yc': ds['yc'][1:-1],
-    #     'yg': ds['yg'][1:-1],
-    #     'xc': ds['xc'][1:-1],
-    #     'xg': ds['xg'][1:-1],
-    # })
-    # grid_interp = xgcm.Grid(ds_interp, coords={
-    #     'X': {'center': 'xc', 'left': 'xg'},
-    #     'Y': {'center': 'yc', 'left': 'yg'},
-    #     'Z': {'center': 'zc'},
-    #     'T': {'center': 'time'}
-    # })
+    print(f"min(XG) : {ds['xg'][1:-1].min().values}, max(XG) : {ds['xg'][1:-1].max().values}")
+    print(f"min(XC) : {ds['xc'][1:-1].min().values}, max(XC) : {ds['xc'][1:-1].max().values}")
+    print(f"min(YG) : {ds['yg'][1:-1].min().values}, max(YG) : {ds['yg'][1:-1].max().values}")
+    print(f"min(YC) : {ds['yc'][1:-1].min().values}, max(YC) : {ds['yc'][1:-1].max().values}")
+
+    print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
+    # create new dataset with interpolated variables
+    ds_interp = xr.Dataset({
+        'U': (['time', 'zc', 'xg'], U.values),
+        'V': (['time', 'zc', 'xc'], V.values),
+        'T': (['time', 'zc', 'xc'], T.values),
+        'S': (['time', 'zc', 'xc'], S.values),
+        'Eta': (['time', 'xc'], Eta.values),
+    }, coords={
+        'time': ds['time'],
+        'zc': ds['zc'],
+        'xc': ds['xc'][1:-1],
+        'xg': ds['xg'][1:-1],
+    })
+    grid_interp = xgcm.Grid(ds_interp, coords={
+        'X': {'center': 'xc', 'left': 'xg'},
+        'Z': {'center': 'zc'},
+        'T': {'center': 'time'}
+    })
 
     # # # print(U.shape, V.shape, T.shape, S.shape, Eta.shape)
-    # print(ds_interp)
+    print(ds_interp)
     # plot_mask(ds_interp, working_directory=config.get('working_directory', '.'))
     # plot_bathy(ds_interp, working_directory=config.get('working_directory', '.'))
     # plot_zbot(ds_interp, working_directory=config.get('working_directory', '.'))
