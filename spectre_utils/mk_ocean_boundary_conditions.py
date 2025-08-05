@@ -161,8 +161,8 @@ def get_boundary_conditions(config):
         end_date=end_date,
         min_long=max_long-2.0*dx,
         max_long=max_long,
-        min_lat=max_lat,
-        max_lat=min_lat,
+        min_lat=min_lat,
+        max_lat=max_lat,
         min_depth=min_depth,
         max_depth=max_depth,
         working_directory=working_directory,
@@ -176,8 +176,8 @@ def get_boundary_conditions(config):
         end_date=end_date,
         min_long=min_long,
         max_long=min_long+2.0*dx,
-        min_lat=max_lat,
-        max_lat=min_lat,
+        min_lat=min_lat,
+        max_lat=max_lat,
         min_depth=min_depth,
         max_depth=max_depth,
         working_directory=working_directory,
@@ -358,19 +358,19 @@ def main():
     print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
     # create new dataset with interpolated variables
     ds_interp = xr.Dataset({
-        'U': (['time', 'zc', 'xg'], U.values),
-        'V': (['time', 'zc', 'xc'], V.values),
-        'T': (['time', 'zc', 'xc'], T.values),
-        'S': (['time', 'zc', 'xc'], S.values),
+        'U': (['time', 'zc', 'yc'], U.values),
+        'V': (['time', 'zc', 'yg'], V.values),
+        'T': (['time', 'zc', 'yc'], T.values),
+        'S': (['time', 'zc', 'yc'], S.values),
         'Eta': (['time', 'xc'], Eta.values),
     }, coords={
         'time': ds['time'],
         'zc': ds['zc'],
-        'xc': ds['xc'][1:-1],
-        'xg': ds['xg'][1:-1],
+        'yc': ds['yc'][1:-1],
+        'yg': ds['yg'][1:-1],
     })
     grid_interp = xgcm.Grid(ds_interp, coords={
-        'X': {'center': 'xc', 'left': 'xg'},
+        'Y': {'center': 'yc', 'left': 'yg'},
         'Z': {'center': 'zc'},
         'T': {'center': 'time'}
     })
@@ -419,19 +419,19 @@ def main():
     print(f"U shape: {U.shape}, V shape: {V.shape}, T shape: {T.shape}, S shape: {S.shape}, Eta shape: {Eta.shape}")
     # create new dataset with interpolated variables
     ds_interp = xr.Dataset({
-        'U': (['time', 'zc', 'xg'], U.values),
-        'V': (['time', 'zc', 'xc'], V.values),
-        'T': (['time', 'zc', 'xc'], T.values),
-        'S': (['time', 'zc', 'xc'], S.values),
-        'Eta': (['time', 'xc'], Eta.values),
+        'U': (['time', 'zc', 'yc'], U.values),
+        'V': (['time', 'zc', 'yg'], V.values),
+        'T': (['time', 'zc', 'yc'], T.values),
+        'S': (['time', 'zc', 'yc'], S.values),
+        'Eta': (['time', 'yc'], Eta.values),
     }, coords={
         'time': ds['time'],
         'zc': ds['zc'],
-        'xc': ds['xc'][1:-1],
-        'xg': ds['xg'][1:-1],
+        'yc': ds['yc'][1:-1],
+        'yg': ds['yg'][1:-1],
     })
     grid_interp = xgcm.Grid(ds_interp, coords={
-        'X': {'center': 'xc', 'left': 'xg'},
+        'Y': {'center': 'yc', 'left': 'yg'},
         'Z': {'center': 'zc'},
         'T': {'center': 'time'}
     })

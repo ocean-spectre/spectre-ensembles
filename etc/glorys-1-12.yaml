@@ -16,8 +16,17 @@ ocean:
   prefix: "glorysv12"
 atmosphere:
   dataset_url: "https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5"
-  dataset_id: ""
-  variables: []
+  dataset_id: "reanalysis-era5-single-levels"
+  variables:
+    10m_u_component_of_wind: "u10"
+    10m_v_component_of_wind: "v10"
+    2m_dewpoint_temperature: "d2m"
+    2m_temperature: "t2m"
+    total_precipitation: "precip"
+    mean_surface_downward_short_wave_radiation_flux: "ssrd"
+    mean_surface_net_long_wave_radiation_flux: "slrd"
+  years: [2002,2003]
+  prefix: "era5"
   cheapaml: True
 
 domain:
