@@ -25,6 +25,7 @@ atmosphere:
     total_precipitation: "precip"
     mean_surface_downward_short_wave_radiation_flux: "ssrd"
     mean_surface_net_long_wave_radiation_flux: "slrd"
+    mean_sea_level_pressure: "pressure"
   years: [2002,2003]
   prefix: "era5"
   cheapaml: True
