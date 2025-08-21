@@ -46,16 +46,18 @@ module list
 echo "----------------------------"
 
 # COMPILE
-mkdir -p $cwd/build
+if [ -d $spectre_cwd/build ]; then
+  rm -rf $spectre_cwd/build
+fi 
 
-cd $cwd/build/
-rm -rf ./*
-$spectre_dirModel/tools/genmake2 -rootdir=$spectre_dirModel -mods=$cwd/$ensemble_root/$simulation_template/$rank_count/code -ds -mpi -optfile $cwd/opt/$optfile
+mkdir -p $spectre_cwd/build
+cd $spectre_cwd/build/
+$spectre_mitgcm_source_code/tools/genmake2 -rootdir=$spectre_mitgcm_source_code -mods=$spectre_model_code -ds -mpi -optfile $spectre_optfile
 make depend
 make -j 2
 cd ../
 
 # Copy executable to exe directory
-mkdir -p $cwd/exe/$simulation_template/$rank_count
-cp -p ./build/mitgcmuv ./exe/$simulation_template/$rank_count/mitgcmuv
-cp -p ./build/Makefile ./exe/$simulation_template/$rank_count/Makefile
+mkdir -p $spectre_model_exe_dir
+cp -p ./build/mitgcmuv $spectre_model_exe_dir/mitgcmuv
+cp -p ./build/Makefile $spectre_model_exe_dir/Makefile
