@@ -1,17 +1,18 @@
-# Spectre - 150
+# Spectre ensembles
 
 This repository is adapted from https://github.com/quentinjamet/SPECTRE
 
 Main differences include
 * MITgcm as a submodule
 * Ocean boundary conditions are from Glorys v12 and the same across all ensemble members
+* All simulation suites are defined by yamls that are used to drive input deck generation and job submission scripts
 
 
 ## Get Started
 Clone this repository and recursively grab submodules
 
 ```
-git clone --recurse-submodules https://github.com/ocean-spectre/spectre-150
+git clone --recurse-submodules https://github.com/ocean-spectre/spectre-ensembles
 ```
 
 
