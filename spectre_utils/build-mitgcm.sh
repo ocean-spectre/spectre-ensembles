@@ -1,25 +1,46 @@
 #!/bin/bash
-
-cwd=$(pwd)
-optfile='derecho'
-simulation_template='mitgcm50_z75' #TODO: Set your simulation template here!
-rank_count=192
-ensemble_root='simulations'
+#
+#
 
 
+# Usage: ./build_mitgcm.sh -e myenvfile.env
 
-################################## DO NOT MODIFY BELOW ####################################
-#               (unless you really know what you're doing....)
-###########################################################################################
+usage() {
+    echo "Usage: $0 -e <envfile>"
+    exit 1
+}
 
-dirModel="${cwd}/MITgcm"
+# Parse arguments
+while getopts "e:" opt; do
+  case "$opt" in
+    e) ENVFILE="$OPTARG" ;;
+    *) usage ;;
+  esac
+done
 
-#-- load appropriate modules --
-# (example for Derecho-NCAR)
-module --force purge
-module load ncarenv/24.12 intel-oneapi/2024.2.1 cray-mpich/8.1.29 hdf5/1.12.3 netcdf/4.9.2 
-#hdf5-mpi/1.12.3 netcdf-mpi/4.9.2
+# Require envfile argument
+if [ -z "$ENVFILE" ]; then
+    usage
+fi
 
+# Check file exists
+if [ ! -f "$ENVFILE" ]; then
+    echo "Error: Environment file '$ENVFILE' not found."
+    exit 1
+fi
+
+# Source the environment file
+echo "Sourcing environment file: $ENVFILE"
+# shellcheck source=/dev/null
+source "$ENVFILE"
+
+# Example: show one of the vars
+echo "============================"
+echo "Loaded ENV VARS"
+echo "----------------------------"
+env | grep "spectre_"
+echo "============================"
+echo "Loaded Modules"
 echo "----------------------------"
 module list
 echo "----------------------------"
@@ -29,7 +50,7 @@ mkdir -p $cwd/build
 
 cd $cwd/build/
 rm -rf ./*
-$dirModel/tools/genmake2 -rootdir=$dirModel -mods=$cwd/$ensemble_root/$simulation_template/$rank_count/code -ds -mpi -optfile $cwd/opt/$optfile
+$spectre_dirModel/tools/genmake2 -rootdir=$spectre_dirModel -mods=$cwd/$ensemble_root/$simulation_template/$rank_count/code -ds -mpi -optfile $cwd/opt/$optfile
 make depend
 make -j 2
 cd ../
