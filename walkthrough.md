@@ -31,8 +31,8 @@ spectre-150
 
 ### download the repo
 ```bash
-git clone --recurse-submodules https://github.com/ocean-spectre/spectre-150
-cd spectre-150
+git clone --recurse-submodules https://github.com/ocean-spectre/spectre-ensembles
+cd spectre-ensembles
 ```
 
 ### set up simulations/templates
@@ -55,9 +55,9 @@ The directory structure goes: `simulations/<simulation name>/<mpi ranks>`. Withi
 ### build mitgcm
 set rank count (line 6)
 ```bash
-./src/build-mitgcm.sh
+./workflows/build-mitgcm.sh -e env/derecho.sh
 ```
-Building MITgcm copies the executable to `exe/$simulation_template/$rank_count/mitgcmuv`. Also the `Makefile` to `exe/$simulation_template/$rank_count/Makefile`
+
 
 ### preparing testrun script
 in `testrun384.sh`:
