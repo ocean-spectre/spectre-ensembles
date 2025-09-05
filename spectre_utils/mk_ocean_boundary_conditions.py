@@ -388,11 +388,11 @@ def main():
 
     print("=========================================================")
 
-        ###############################################################################
-    # West boundary conditions
     ###############################################################################
-    ds, grid = bcs['west']
-    print("Processing West boundary conditions...")
+    # East boundary conditions
+    ###############################################################################
+    ds, grid = bcs['east']
+    print("Processing East boundary conditions...")
     print("=========================================================")
     if ds.isnull().any():
         print("Warning: Input dataset contains NaN values. Patching values...")

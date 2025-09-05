@@ -41,13 +41,13 @@
 # Time stepping parameters
  &PARM03
  nIter0=0,
- baseTime=172800.0,
+ baseTime=0.0,
 # End at end of day 365
  endTime=31536000.0,
  deltaT=120.0,
  abEps=0.01,
- pChkptFreq=864000.0, 
- chkptFreq=864000.0,
+ pChkptFreq=31536000.0, 
+ chkptFreq=3153600.0,
  dumpFreq=86400.0,
  monitorSelect=2,
  monitorFreq=3600.0,
@@ -61,17 +61,17 @@
  &PARM04
  usingCartesianGrid=.FALSE.,
  usingSphericalPolarGrid=.TRUE.,
- ygOrigin=27.9947,
- delXFile='dx.bin',
- delYFile='dy.bin',
- delRFile='dz.bin',
+ ygOrigin=26.041667938232422,
+ delXFile='dx.bin', # TODO
+ delYFile='dy.bin', # TODO
+ delRFile='dz.bin', # TODO
  &end
 # Input datasets
  &PARM05
  bathyFile='gebco_smoothed_topog_pave20m.bin',
- hydrogThetaFile='t.spinup-03.bin',
- pSurfInitFile='eta.spinup-03.bin',
- hydrogSaltFile='s.spinup-03.bin',
- uVelInitFile='u.spinup-03.bin',
- vVelInitFile='v.spinup-03.bin',
+ hydrogThetaFile='T.init.bin',
+ pSurfInitFile='Eta.init.bin',
+ hydrogSaltFile='S.init.bin',
+ uVelInitFile='U.init.bin',
+ vVelInitFile='V.init.bin',
  &end

@@ -181,35 +181,35 @@ def main():
     if not os.path.exists(animations_dir):
         os.makedirs(animations_dir)
 
-    animate_variable(ds_interp, "u10", out_path=os.path.join(animations_dir, "u10.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "v10", out_path=os.path.join(animations_dir, "v10.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "t2m", out_path=os.path.join(animations_dir, "t2m.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "d2m", out_path=os.path.join(animations_dir, "d2m.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "q", out_path=os.path.join(animations_dir, "q.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "avg_sdswrf", out_path=os.path.join(animations_dir, "avg_sdswrf.mp4"), fps=8, cmap="plasma")
-    animate_variable(ds_interp, "avg_snlwrf", out_path=os.path.join(animations_dir, "avg_snlwrf.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "u10", out_path=os.path.join(animations_dir, "u10.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "v10", out_path=os.path.join(animations_dir, "v10.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "t2m", out_path=os.path.join(animations_dir, "t2m.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "d2m", out_path=os.path.join(animations_dir, "d2m.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "q", out_path=os.path.join(animations_dir, "q.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "avg_sdswrf", out_path=os.path.join(animations_dir, "avg_sdswrf.mp4"), fps=8, cmap="plasma")
+    # animate_variable(ds_interp, "avg_snlwrf", out_path=os.path.join(animations_dir, "avg_snlwrf.mp4"), fps=8, cmap="plasma")
 
-    # # Write fields to binary files
-    # with open(os.path.join(simulation_input_dir, 'u10.bin'), 'wb') as f:
-    #     ds_interp['u10'].values.astype('>f4').tofile(f)
+    # Write fields to binary files
+    with open(os.path.join(simulation_input_dir, 'u10.bin'), 'wb') as f:
+        ds_interp['u10'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 'v10.bin'), 'wb') as f:
-    #     ds_interp['v10'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'v10.bin'), 'wb') as f:
+        ds_interp['v10'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 't2m.bin'), 'wb') as f:
-    #     ds_interp['t2m'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 't2m.bin'), 'wb') as f:
+        ds_interp['t2m'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 'q2m.bin'), 'wb') as f:
-    #     ds_interp['q'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'q2m.bin'), 'wb') as f:
+        ds_interp['q'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 'avg_sdswrf.bin'), 'wb') as f:
-    #     ds_interp['avg_sdswrf'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'avg_sdswrf.bin'), 'wb') as f:
+        ds_interp['avg_sdswrf'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 'avg_snlwrf.bin'), 'wb') as f:
-    #     ds_interp['avg_snlwrf'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'avg_snlwrf.bin'), 'wb') as f:
+        ds_interp['avg_snlwrf'].values.astype('>f4').tofile(f)
 
-    # with open(os.path.join(simulation_input_dir, 'tp.bin'), 'wb') as f:
-    #     ds_interp['tp'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'tp.bin'), 'wb') as f:
+        ds_interp['tp'].values.astype('>f4').tofile(f)
 
     data_cheapaml = f"""
 # cheapaml parameters
