@@ -231,6 +231,12 @@ def main():
     zbot = ds_static['deptho_lev'][1:-1,1:-1]
     bathy = ds_static['deptho'][1:-1,1:-1]
 
+    zf = np.zeros(ds['zc'].shape[0]+1)
+    zf[1:-1] = (ds['zc'].values[:-1] + ds['zc'].values[1:])/2.0
+    zf[-1] = zf[-2] + 2.0*(ds['zc'].values[-1] + zf[-2])
+    ds['zf'] = (('zf',), zf)
+    # dz = np.diff(zf)
+
     # create new dataset with interpolated variables
     ds_interp = xr.Dataset({
         'U': (['time', 'zc', 'yc', 'xg'], U.values),
@@ -244,6 +250,7 @@ def main():
     }, coords={
         'time': ds['time'],
         'zc': ds['zc'],
+        'zf': ds['zf'],
         'yc': ds['yc'][1:-1],
         'yg': ds['yg'][1:-1],
         'xc': ds['xc'][1:-1],
@@ -252,11 +259,21 @@ def main():
     grid_interp = xgcm.Grid(ds_interp, coords={
         'X': {'center': 'xc', 'left': 'xg'},
         'Y': {'center': 'yc', 'left': 'yg'},
-        'Z': {'center': 'zc'},
+        'Z': {'center': 'zc', 'outer': 'zf'},
         'T': {'center': 'time'}
     })
 
     print(ds_interp)
+    # Calculate grid spacing
+    dx = grid_interp.diff(ds_interp['xg'], 'X')
+    dy = grid_interp.diff(ds_interp['yg'], 'Y')
+    dz = grid_interp.diff(ds_interp['zf'], 'Z')
+    ds_interp['dx'] = dx
+    ds_interp['dy'] = dy
+    ds_interp['dz'] = dz
+    
+
+
     # Check if there are any NaN values in the dataset
     if ds_interp.isnull().any():
         print("Warning: The dataset contains NaN values. This may cause issues in the simulation.")
@@ -298,7 +315,14 @@ def main():
         ds_interp['xg'].values.astype('>f4').tofile(f)
     with open(os.path.join(simulation_input_dir, 'yg.bin'), 'wb') as f:
         ds_interp['yg'].values.astype('>f4').tofile(f)
-
+    with open(os.path.join(simulation_input_dir, 'zf.bin'), 'wb') as f:
+        ds_interp['zf'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'dx.bin'), 'wb') as f:
+        ds_interp['dx'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'dy.bin'), 'wb') as f:
+        ds_interp['dy'].values.astype('>f4').tofile(f)
+    with open(os.path.join(simulation_input_dir, 'dz.bin'), 'wb') as f:
+        ds_interp['dz'].values.astype('>f4').tofile(f)
 
 
 if __name__ == "__main__":
