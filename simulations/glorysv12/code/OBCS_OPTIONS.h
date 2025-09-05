@@ -13,7 +13,7 @@ C Enable individual open boundaries
 #define ALLOW_OBCS_NORTH
 #define ALLOW_OBCS_SOUTH
 #define ALLOW_OBCS_EAST
-#define ALLOW_OBCS_WEST
+#undef ALLOW_OBCS_WEST
 
 C This include hooks to the Orlanski Open Boundary Radiation code
 #define ALLOW_ORLANSKI
