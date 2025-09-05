@@ -61,14 +61,15 @@
  &PARM04
  usingCartesianGrid=.FALSE.,
  usingSphericalPolarGrid=.TRUE.,
+ xgOrigin=-81.95832824707031,
  ygOrigin=26.041667938232422,
- delXFile='dx.bin', # TODO
- delYFile='dy.bin', # TODO
- delRFile='dz.bin', # TODO
+ delXFile='dx.bin',
+ delYFile='dy.bin',
+ delRFile='dz.bin',
  &end
 # Input datasets
  &PARM05
- bathyFile='gebco_smoothed_topog_pave20m.bin',
+ bathyFile='bathy.bin',
  hydrogThetaFile='T.init.bin',
  pSurfInitFile='Eta.init.bin',
  hydrogSaltFile='S.init.bin',
