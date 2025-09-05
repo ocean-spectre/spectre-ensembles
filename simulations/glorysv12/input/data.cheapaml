@@ -1,0 +1,35 @@
+# cheapaml parameters
+ &CHEAPAML_CONST
+ cheapaml_ntim = 5,
+ cheapaml_mask_width=5,
+ cheapaml_h = 1000.0,
+ cheapaml_kdiff = 1000.0,
+# cheapaml_taurelax = 0.1,
+# cheapaml_taurelaxocean = 0.0
+ &end
+# Forcing Files 
+ &CHEAPAML_PARM01
+ UWindFile='u10.box',
+ VWindFile='v10.box',
+ SolarFile='avg_sdswrf.box',
+ TrFile='t2m.box',
+ AirTempFile='t2m.box',
+ QrFile='q2m.box',
+ AirQFile='q2m.box',
+ cheap_dlwfile='avg_snlwrf.box'
+ cheap_prfile='tp.box'
+ periodicExternalForcing_cheap=.TRUE.,
+ externForcingPeriod_cheap=10800.0,
+ externForcingCycle_cheap=31460400.0,
+ 
+ &end
+# Formulation parameters
+ &CHEAPAML_PARM02
+ useFreshWaterFlux=.TRUE.,
+ FluxFormula='COARE3',
+ useFluxLimit=.TRUE.,
+ usetimevarblh=.FALSE.,
+ useclouds=.FALSE.,
+ usedlongwave=.TRUE.,
+ usePrecip=.TRUE.,
+ &end

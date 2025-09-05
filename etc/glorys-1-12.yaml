@@ -44,7 +44,7 @@ domain:
     max: 10000.0
   time:
     start: "2002-07-01"
-    end: "2003-07-01"
+    end: "2003-06-30"
     #end: "2015-07-01"
 
 simulation:

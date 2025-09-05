@@ -30,3 +30,5 @@ else
     conda activate spectre
     pip install -r requirements.txt
 fi
+
+module load ffmpeg
