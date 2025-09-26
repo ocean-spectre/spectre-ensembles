@@ -63,8 +63,10 @@
  usingSphericalPolarGrid=.TRUE.,
  xgOrigin=-81.95832824707031,
  ygOrigin=26.041667938232422,
- delXFile='dx.bin',
- delYFile='dy.bin',
+ dxSpacing=0.08333,
+ dySpacing=0.08333,
+# delXFile='dx.bin',
+# delYFile='dy.bin',
  delRFile='dz.bin',
  &end
 # Input datasets

@@ -1,8 +1,8 @@
 # Open-boundaries
  &OBCS_PARM01
- OB_Ieast=768*-1,
- OB_Jsouth=320*1,
- OB_Jnorth=320*-1,
+ OB_Ieast=320*-1,
+ OB_Jsouth=768*1,
+ OB_Jnorth=768*-1,
  OBCS_monitorFreq=7200.0,
  useOBCSsponge=.TRUE.,
  useOBCSprescribe=.TRUE.,
