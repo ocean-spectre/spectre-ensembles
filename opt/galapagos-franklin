@@ -31,9 +31,9 @@
 #-------
 
 if test "x$MPI" = xtrue ; then
-  CC=${CC:=mpicc}
-  FC=${FC:=mpif77}
-  F90C=${F90C:=mpif90}
+  CC=mpicc
+  FC=mpif77
+  F90C=mpif90
 else
   CC=gcc
   FC=gfortran

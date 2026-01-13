@@ -8,3 +8,6 @@ mitgcmuv
 *.e*
 build/
 exe/
+*.mitgrid
+STDOUT.*
+STDERR.*
