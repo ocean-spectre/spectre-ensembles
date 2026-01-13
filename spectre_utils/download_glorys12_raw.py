@@ -8,22 +8,62 @@ import xgcm
 import matplotlib.pyplot as plt
 
 
-def get_glorys12_data(start_date, end_date, xmin, xmax, ymin, ymax):
+staticsmap = {
+        'mask':'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1/glorys12v1-pgnstatics/PSY4V3R1_mask.nc',
+        'mesh_hgr':'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1/glorys12v1-pgnstatics/PSY4V3R1_mesh_hgr.nc',
+        'mesh_zgr':'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1/glorys12v1-pgnstatics/PSY4V3R1_mesh_zgr.nc',
+        'bathymetry':'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1/glorys12v1-pgnstatics/PSY4V3R1_ORCA12_bathymetry.nc'
+}
+
+datamap = {
+        'T': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridT',
+        'S': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridS',
+        'U': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridU',
+        'V': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridV',
+        'W': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridW',
+        'KZ': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridKZ',
+        'grid2D': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-grid2D',
+    }
+def get_glorys12_statics(xmin, xmax, ymin, ymax, var):
     import xarray as xr
 
-    ds = xr.open_dataset('dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridT')
-    ldate = pd.date_range(start=start_date, end=end_date, freq='D')
+    datasets = {}
+    url = staticsmap[var]
+    print(f"Downloading from {url}")
+    ds = xr.open_dataset(url,engine='pydap')
 
     region = (ds.nav_lon > xmin) & (ds.nav_lon < xmax) & (ds.nav_lat > ymin) & (ds.nav_lat < ymax)
     indices = np.argwhere(region.values)
-    xmin = min(indices[:,1])
-    xmax = max(indices[:,1])
-    ymin = min(indices[:,0])
-    ymax = max(indices[:,0])
+    imin = min(indices[:,1])
+    imax = max(indices[:,1])
+    jmin = min(indices[:,0])
+    jmax = max(indices[:,0])
     print(f"Extracting data for lon: {xmin} to {xmax}, lat: {ymin} to {ymax}")
-    ds_subdomain = ds.isel({'x':slice(xmin,xmax),'y':slice(ymin,ymax)}).sel({'time_counter':ldate},method="nearest")
+    try:
+        ds_subdomain = ds.isel({'x':slice(imin,imax),'y':slice(jmin,jmax)})
+    except:
+        ds_subdomain = ds.isel({'X':slice(imin,imax),'Y':slice(jmin,jmax)})
 
     print(ds_subdomain)
+    return ds_subdomain
+
+def get_glorys12_data(daterange, xmin, xmax, ymin, ymax, var):
+    import xarray as xr
+
+    datasets = {}
+    ds = xr.open_dataset(datamap[var])
+
+    region = (ds.nav_lon > xmin) & (ds.nav_lon < xmax) & (ds.nav_lat > ymin) & (ds.nav_lat < ymax)
+    indices = np.argwhere(region.values)
+    imin = min(indices[:,1])
+    imax = max(indices[:,1])
+    jmin = min(indices[:,0])
+    jmax = max(indices[:,0])
+    print(f"Extracting data for lon: {xmin} to {xmax}, lat: {ymin} to {ymax}")
+    print(f"Time date range for data selection is : {daterange}")
+    ds_subdomain = ds.isel({'x':slice(imin,imax),'y':slice(jmin,jmax)}).sel({'time_counter':daterange})
+    print(ds_subdomain)
+
     return ds_subdomain
 
 def main():
@@ -46,20 +86,59 @@ def main():
     max_lat = latitude_range.get('max')
     working_directory = config.get('working_directory', '.')
     dataset_prefix = config.get('ocean').get('prefix')
-    
-    ds = get_glorys12_data(
-        start_date=start_date,
-        end_date=end_date,
-        xmin=min_long,
-        xmax=max_long,
-        ymin=min_lat,
-        ymax=max_lat
-    )
 
-    #ds.to_netcdf(os.path.join(working_directory, f"{dataset_prefix}_glorys12_raw.nc"))
+    ldate = pd.date_range(start=start_date, end=end_date, freq='D')
+    ldate = ldate + pd.to_timedelta(12, unit='h')  # Shift to middle of the day, consistent with glorys output timestamp
 
-    ds.votemper[0,:,-1,:].squeeze().plot(vmax=2,vmin=-2)
-    plt.savefig('test.png')
+    if not os.path.exists(working_directory):
+        os.makedirs(working_directory)
+
+    #for var in staticsmap.keys():
+    #  ds = get_glorys12_statics(
+    #      xmin=min_long,
+    #      xmax=max_long,
+    #      ymin=min_lat,
+    #      ymax=max_lat,
+    #      var=var)
+    #  ds.to_netcdf(os.path.join(working_directory, f"{dataset_prefix}_{var}_glorys12_raw.static.nc"))
+
+
+    download_chunk_days = 10
+    chunk = 0
+    for start in range(0,len(ldate),download_chunk_days):
+      end = min(start+download_chunk_days,len(ldate))
+      date_range = ldate[start:end]
+      print(f"Chunk {chunk} : {date_range[0]} to {date_range[-1]}")
+      chunk+=1
+      for var in datamap.keys():
+        ds = get_glorys12_data(
+            daterange=date_range,
+            xmin=min_long,
+            xmax=max_long,
+            ymin=min_lat,
+            ymax=max_lat,
+            var=var)
+
+        ds.to_netcdf(os.path.join(working_directory, f"{dataset_prefix}_{var}_glorys12_raw.{chunk}.nc"))
+
 
 if __name__ == "__main__":
     main()
+
+    #datapgn = xr.open_dataset('dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridT')
+    #lon_min = -10
+    #lon_max = 0
+    #lat_min = 42
+    #lat_max = 52
+    #geotest = (datapgn.nav_lon > lon_min) & (datapgn.nav_lon < lon_max) & (datapgn.nav_lat > lat_min) & (datapgn.nav_lat < lat_max)
+    #geoindex = np.argwhere(geotest.values)
+    #xmin = min(geoindex[:,1])
+    #xmax = max(geoindex[:,1])
+    #ymin = min(geoindex[:,0])
+    #ymax = max(geoindex[:,0])
+    #ldate = pd.date_range(start="20150301",end="20150307",freq="D") # all monday between start and end
+    #ldate = ldate + pd.to_timedelta(12, unit='H')  # Shift to middle of the day, consistent with glorys output timestamp
+    ##biscay = datapgn.isel({'x':slice(xmin,xmax),'y':slice(ymin,ymax)}).sel(deptht=[0,5,50,500],method='nearest').sel({'time_counter':ldate},method="nearest") # fails with "ValueError: index must be monotonic increasing or decreasing"
+    #biscay = datapgn.isel({'x':slice(xmin,xmax),'y':slice(ymin,ymax)}).sel(deptht=[0,5,50,500],method='nearest').sel({'time_counter':ldate})
+    #print(biscay.dims)
+    #biscay.to_netcdf("test.nc")

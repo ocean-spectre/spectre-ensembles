@@ -1,0 +1,72 @@
+name: spectre-glorysv12
+description: |
+  Glorys v12 on 1/12 degree resolution for the years 2003-2015. This configuration is mainly used for model to model adapation (NEMO to MITgcm)
+
+working_directory: /group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
+#simulation_directory: /group/tdgs/joe/spectre-150-ensembles/simulations/glorysv12-curvilinear
+simulation_directory: /apps/workspace/joe
+  #simulation_directory: /mnt/franklin/apps/workspace/joe
+refine_factor: 1
+
+statics:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_static"
+  variables: ["mask","deptho","deptho_lev"]
+  prefix: "glorysv12_static"
+ocean:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+  variables: ["thetao","so","uo","vo","zos"]
+  prefix: "glorysv12"
+atmosphere:
+  dataset_url: "https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5"
+  dataset_id: "reanalysis-era5-single-levels"
+  variables:
+    10m_u_component_of_wind: "u10"
+    10m_v_component_of_wind: "v10"
+    2m_dewpoint_temperature: "d2m"
+    2m_temperature: "t2m"
+    total_precipitation: "precip"
+    mean_surface_downward_short_wave_radiation_flux: "ssrd"
+    mean_surface_net_long_wave_radiation_flux: "slrd"
+    mean_sea_level_pressure: "pressure"
+  years: [2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017]
+  prefix: "era5"
+  cheapaml: True
+
+domain:
+  mpi:
+    npx: 8
+    npy: 8
+  longitude:
+    min: -82.0
+    max: -17.5
+    start: 2
+    end: -2
+  latitude:
+    min: 26.0
+    max: 50.5
+    start: 1
+    end: -1
+  depth:
+    min: 0.0
+    max: 10000.0
+  time:
+    start: "2002-07-01"
+      #end: "2003-06-30"
+    end: "2017-07-01"
+
+simulation:
+  jobs:
+    flags:
+      - "--select=2:ncpus=64:mpiprocs=64:mem=256GB"
+      - "--time=8:00:00"
+      - "--queue=economy"
+    model_years_per_job: 1.0
+
+  spinup:
+    start: "2002-07-01"
+    end: "2003-07-01"
+    repeat_years: 5
+
+
+  
+
