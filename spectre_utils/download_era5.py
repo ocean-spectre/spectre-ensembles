@@ -22,11 +22,13 @@ def main():
     # Create working_directory directory if it doesn't exist
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
-    for var in vars.keys():
+    for var in vars:
+        era_name = var["era_name"]
+        mitgcm_name = var["mitgcm_name"]
         for year in years:
             request = {
             "product_type": ["reanalysis"],
-            "variable": [var],
+            "variable": [era_name],
             "year": [year],
             "month": [
                 "01", "02", "03",
@@ -56,7 +58,7 @@ def main():
             "download_format": "unarchived",
             "area": [60, -90, 20, -10]
             }
-            target = f"{working_directory}/{prefix}_{vars[var]}_{year}.nc"
+            target = f"{working_directory}/{prefix}_{mitgcm_name}_{year}.nc"
             print(f"Downloading {target} ...")
             if os.path.exists(target):
                 print(f"File {target} already exists. Skipping download.")

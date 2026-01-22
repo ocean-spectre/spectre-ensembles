@@ -3,8 +3,8 @@
 #SBATCH -c8
 #SBATCH --nodelist=noether
 #SBATCH --job-name=spectre_era5
-#SBATCH --output=./spectre_era5.out
-#SBATCH --error=./spectre_era5.out
+#SBATCH --output=./spectre_era5-%A.out
+#SBATCH --error=./spectre_era5-%A.out
 
 
 ###############################################################################################
