@@ -15,4 +15,3 @@ module load netcdf-fortran/4.6.2
 
 export MPI=yes
 export NETCDF_ROOT=$NETCDF_FORTRAN_ROOT
-export LD_LIBRARY_PATH=$NETCDF_ROOT/lib:$NETCDF_FORTRAN_ROOT/lib:$OPENMPI_ROOT/lib:$LD_LIBRARY_PATH
