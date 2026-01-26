@@ -14,112 +14,122 @@
   exf_scal_BulkCdn     = 1.0,
   ! Grid/rotation/wind options for curvilinear grids:
   readStressOnAgrid    = .FALSE.,   ! we read winds (uwind/vwind) not stresses by default
-  rotateStressOnAgrid  = .TRUE.,    ! if you read stresses on A-grid: rotate them to UV
+  rotateStressOnAgrid  = .TRUE.,    ! rotate stress
   readStressOnCgrid    = .FALSE.,
   useAtmWind           = .TRUE.,    ! use uwind/vwind to compute stress (and rotate them)
-  useRelativeWind      = .FALSE.,
+  useRelativeWind      = .FALSE.,   ! Do we want this on ??
   hu                   = 10.0,      ! height (m) of wind observations (10 m)
   ht                   = 2.0,       ! height (m) of temp/humidity (2 m)
   zref                 = 10.0,      ! reference height (10 m)
-  ! other useful defaults (adjust as needed)
-  umin                 = 0.5,
-  atmrho               = 1.2,
 /
 
 &EXF_NML_02
   ! --- filenames, startdates and periods (seconds) ---
   ! Wind components (10 m)
-  uwindfile       = 'era_u10_6h.bin',
-  uwindstartdate1 = 20030601,
+  uwindfile       = 'uwind.bin',
+  uwindstartdate1 = 20020701,
   uwindstartdate2 = 000000,
-  uwindperiod     = 21600.0,     ! 6 hours
+  uwindperiod     = 10800.0,     ! 3 hours
+  uwind_lon0 = -90.0 
+  uwind_lon_inc = 0.25
+  uwind_lat0 = 20.0
+  uwind_lat_inc = 0.25
+  uwind_nlon = 321
+  uwind_nlat = 161
 
-  vwindfile       = 'era_v10_6h.bin',
-  vwindstartdate1 = 20030601,
+  vwindfile       = 'vwind.bin',
+  vwindstartdate1 = 20020701,
   vwindstartdate2 = 000000,
-  vwindperiod     = 21600.0,
+  vwindperiod     = 10800.0,
+  vwind_lon0 = -90.0 
+  vwind_lon_inc = 0.25
+  vwind_lat0 = 20.0
+  vwind_lat_inc = 0.25
+  vwind_nlon = 321
+  vwind_nlat = 161
 
   ! 2-m air temperature (K)
-  atempfile       = 'era_t2m_6h.bin',
-  atempstartdate1 = 20030601,
+  atempfile       = 'atemp.bin',
+  atempstartdate1 = 20020701,
   atempstartdate2 = 000000,
-  atempperiod     = 21600.0,
+  atempperiod     = 10800.0,
+  atemp_lon0 = -90.0 
+  atemp_lon_inc = 0.25
+  atemp_lat0 = 20.0
+  atemp_lat_inc = 0.25
+  atemp_nlon = 321
+  atemp_nlat = 161
 
-  ! 2-m specific humidity (kg/kg) (if you only have dew point or RH, convert first)
-  aqhfile         = 'era_q2m_6h.bin',
-  aqhstartdate1   = 20030601,
+  ! 2-m specific humidity (kg/kg)
+  aqhfile         = 'aqh.bin',
+  aqhstartdate1   = 20020701,
   aqhstartdate2   = 000000,
-  aqhperiod       = 21600.0,
+  aqhperiod       = 10800.0,
+  aqh_lon0 = -90.0 
+  aqh_lon_inc = 0.25
+  aqh_lat0 = 20.0
+  aqh_lat_inc = 0.25
+  aqh_nlon = 321
+  aqh_nlat = 161
 
-  ! surface pressure (Pa)
-  apressurefile   = 'era_sp_6h.bin',
-  apressurestartdate1 = 20030601,
-  apressurestartdate2 = 000000,
-  apressureperiod = 21600.0,
-
-  ! radiation / precipitation
-  swdownfile      = 'era_swdown_6h.bin',
-  swdownstartdate1= 20030601,
+  ! shortwave radiation
+  swdownfile      = 'swdown.bin',
+  swdownstartdate1= 20020701,
   swdownstartdate2= 000000,
-  swdownperiod    = 21600.0,
+  swdownperiod    = 10800.0,
+  swdown_lon0 = -90.0 
+  swdown_lon_inc = 0.25
+  swdown_lat0 = 20.0
+  swdown_lat_inc = 0.25
+  swdown_nlon = 321
+  swdown_nlat = 161
 
-  lwdownfile      = 'era_lwdown_6h.bin',
-  lwdownstartdate1= 20030601,
+  ! Longwave radiation
+  lwdownfile      = 'lwdown.bin',
+  lwdownstartdate1= 20020701,
   lwdownstartdate2= 000000,
-  lwdownperiod    = 21600.0,
+  lwdownperiod    = 10800.0,
+  lwdown_lon0 = -90.0 
+  lwdown_lon_inc = 0.25
+  lwdown_lat0 = 20.0
+  lwdown_lat_inc = 0.25
+  lwdown_nlon = 321
+  lwdown_nlat = 161
 
-  precipfile      = 'era_precip_6h.bin',
-  precipstartdate1= 20030601,
+  ! Precipitation
+  precipfile      = 'precip.bin',
+  precipstartdate1= 20020701,
   precipstartdate2= 000000,
-  precipperiod    = 21600.0,
+  precipperiod    = 10800.0,
+  precip_lon0 = -90.0 
+  precip_lon_inc = 0.25
+  precip_lat0 = 20.0
+  precip_lat_inc = 0.25
+  precip_nlon = 321
+  precip_nlat = 161
 
-  ! Sea-surface temperature from your model (NEMO/Glory v12)
-  sstfile         = 'nemo_sst_6h.bin',
-  sststartdate1   = 20030601,
-  sststartdate2   = 000000,
-  sstperiod       = 21600.0,
+  ! Evaporation
+  evapfile      = 'evap.bin',
+  evapstartdate1= 20020701,
+  evapstartdate2= 000000,
+  evapperiod    = 10800.0,
+  evap_lon0 = -90.0 
+  evap_lon_inc = 0.25
+  evap_lat0 = 20.0
+  evap_lat_inc = 0.25
+  evap_nlon = 321
+  evap_nlat = 161
+
+  ! Runoff
+  runofffile      = 'runoff.bin',
+  runoffstartdate1= 20020701,
+  runoffstartdate2= 000000,
+  runoffperiod    = 10800.0,
+  runoff_lon0 = -90.0 
+  runoff_lon_inc = 0.25
+  runoff_lat0 = 20.0
+  runoff_lat_inc = 0.25
+  runoff_nlon = 321
+  runoff_nlat = 161
 /
   
-&EXF_NML_03
-  ! Per-field input scaling and basic constants (adjust if your files need scaling)
-  exf_inscal_uwind    = 1.0,
-  exf_inscal_vwind    = 1.0,
-  exf_inscal_atemp    = 1.0,
-  exf_inscal_aqh      = 1.0,
-  exf_inscal_apressure= 1.0,
-  exf_inscal_swdown   = 1.0,
-  exf_inscal_lwdown   = 1.0,
-  exf_inscal_precip   = 1.0,
-  exf_inscal_sst      = 1.0,
-
-  ! If your atemp is in K and you prefer EXF to expect degC, set exf_offset_atemp = 273.16.
-  ! However EXF expects atemp in K by default, so the offset below left at 0.0.
-  exf_offset_atemp    = 0.0,
-
-  ! Bulk constants (defaults, adjust for Large & Yeager if desired)
-  exf_scal_BulkCdn    = 1.0,
-/
-  
-&EXF_NML_04
-  ! --- interpolation metadata for input fields (regular lat-lon ERA-Interim 0.75deg) ---
-  ! Replace lon0/lat0/inc/nlon/nlat with the exact metadata of your ERA files.
-  ! Typical ERA-Interim 0.75deg centers are given here as an example.
-  uwind_lon0    = -180.0, uwind_lon_inc    = 0.75, uwind_lat0    = -89.625, uwind_lat_inc    = 0.75, uwind_nlon    = 480, uwind_nlat    = 240, uwind_interpMethod = 11,
-  vwind_lon0    = -180.0, vwind_lon_inc    = 0.75, vwind_lat0    = -89.625, vwind_lat_inc    = 0.75, vwind_nlon    = 480, vwind_nlat    = 240, vwind_interpMethod = 21,
-
-  atemp_lon0    = -180.0, atemp_lon_inc    = 0.75, atemp_lat0    = -89.625, atemp_lat_inc    = 0.75, atemp_nlon    = 480, atemp_nlat    = 240, atemp_interpMethod = 1,
-  aqh_lon0      = -180.0, aqh_lon_inc      = 0.75, aqh_lat0      = -89.625, aqh_lat_inc      = 0.75, aqh_nlon      = 480, aqh_nlat      = 240, aqh_interpMethod = 1,
-  apressure_lon0= -180.0, apressure_lon_inc= 0.75, apressure_lat0= -89.625, apressure_lat_inc= 0.75, apressure_nlon= 480, apressure_nlat= 240, apressure_interpMethod = 1,
-
-  swdown_lon0   = -180.0, swdown_lon_inc   = 0.75, swdown_lat0   = -89.625, swdown_lat_inc   = 0.75, swdown_nlon   = 480, swdown_nlat   = 240, swdown_interpMethod = 1,
-  lwdown_lon0   = -180.0, lwdown_lon_inc   = 0.75, lwdown_lat0   = -89.625, lwdown_lat_inc   = 0.75, lwdown_nlon   = 480, lwdown_nlat   = 240, lwdown_interpMethod = 1,
-  precip_lon0   = -180.0, precip_lon_inc   = 0.75, precip_lat0   = -89.625, precip_lat_inc   = 0.75, precip_nlon   = 480, precip_nlat   = 240, precip_interpMethod = 1,
-
-  sst_lon0      = -180.0, sst_lon_inc      = 0.75, sst_lat0      = -89.625, sst_lat_inc      = 0.75, sst_nlon      = 480, sst_nlat      = 240, sst_interpMethod = 1,
-
-  ! Vector-interp settings:
-  !   uwind_interpMethod = 11 (U-vector bilinear), vwind_interpMethod = 21 (V-vector bilinear)
-  !   uvInterp = .TRUE. -> use EXF_INTERP_UV to interpolate the pair (u,v) together
-  uvInterp        = .TRUE.,
-/
-

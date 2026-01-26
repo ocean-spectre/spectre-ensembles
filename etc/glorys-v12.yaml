@@ -4,8 +4,8 @@ description: |
 
 working_directory: /group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
 #simulation_directory: /group/tdgs/joe/spectre-150-ensembles/simulations/glorysv12-curvilinear
-simulation_directory: /apps/workspace/joe
-  #simulation_directory: /mnt/franklin/apps/workspace/joe
+simulation_directory: /mnt/beegfs/spectre-ensembles/glorysv12-curvilinear
+
 refine_factor: 1
 
 statics:
@@ -40,6 +40,10 @@ atmosphere:
       mitgcm_name: "runoff" 
     - era_name: "evaporation"
       mitgcm_name: "evap"
+  computed_variables:
+    - mitgcm_name: "aqh"
+      era_name: "q"
+      function: "specific_humdity_from_dewpoint"
   years: [2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017]
   prefix: "era5"
   cheapaml: True
@@ -63,8 +67,8 @@ domain:
     max: 10000.0
   time:
     start: "2002-07-01"
-      #end: "2003-06-30"
-    end: "2017-07-01"
+    #end: "2003-06-30"
+    end: "2017-06-30"
 
 simulation:
   jobs:
