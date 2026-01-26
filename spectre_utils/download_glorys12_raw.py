@@ -111,6 +111,12 @@ def main():
       print(f"Chunk {chunk} : {date_range[0]} to {date_range[-1]}")
       chunk+=1
       for var in datamap.keys():
+        target = os.path.join(working_directory, f"{dataset_prefix}_{var}_glorys12_raw.{chunk}.nc")
+        if os.path.exists(target):
+            print(f"File {target} already exists. Skipping download.")
+            continue
+
+        print(f"Downloading {target} ...")
         ds = get_glorys12_data(
             daterange=date_range,
             xmin=min_long,

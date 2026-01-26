@@ -2,17 +2,20 @@
 #SBATCH -n1
 #SBATCH -c8
 #SBATCH --nodelist=franklin
-#SBATCH --job-name=spectre_tar
-#SBATCH --output=./spectre_tar.out
-#SBATCH --error=./spectre_tar.out
+#SBATCH --job-name=spectre_glorysv12_build
+#SBATCH --output=%x-%A.out
+#SBATCH --error=%x-%A.out
+
+
 ###############################################################################################
 #   Setup the software environment
 ###############################################################################################
-source ./galapagos_env.sh
+source ./galapagos_env.sh 
 module list
 conda env list
 
 ###############################################################################################
-# Run the script to package the input decks
+# Run the script to generate ocean boundary conditions
 ###############################################################################################
-tar -cvzf glorys_v1.12_input_decks.tar.gz ${spectre_ensembles}/simulations/glorysv12/input/
+$(pwd)/../build-mitgcm.sh -e $(pwd)/../../env/galapagos-franklin-glorysv12-curvilinear.sh
+###############################################################################

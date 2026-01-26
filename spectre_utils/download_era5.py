@@ -59,10 +59,10 @@ def main():
             "area": [60, -90, 20, -10]
             }
             target = f"{working_directory}/{prefix}_{mitgcm_name}_{year}.nc"
-            print(f"Downloading {target} ...")
             if os.path.exists(target):
                 print(f"File {target} already exists. Skipping download.")
                 continue
+            print(f"Downloading {target} ...")
             client.retrieve(dataset, request, target)
 
 if __name__ == "__main__":
