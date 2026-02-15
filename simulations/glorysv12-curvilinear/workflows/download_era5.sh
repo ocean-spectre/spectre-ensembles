@@ -7,12 +7,14 @@
 #SBATCH --error=./spectre_era5-%A.out
 
 
-HOST_DATADIR=/group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+source $SCRIPT_DIR/env.sh
+
 ###############################################################################################
 # Run the script to download ERA5 data
 ###############################################################################################
-srun --container-image=ghcr.io/ocean-spectre/spectre-150-ensembles/spectre-utils:latest \
-     --container-mounts=$(pwd):/workspace,${HOST_DATADIR}:/data \
+srun --container-image=$SPECTRE_UTILS_IMG \
+     --container-mounts=${SCRIPT_DIR}/../:/workspace,${HOST_DATADIR}:/data \
      python /opt/spectre_utils/download_era5.py /workspace/etc/config.yaml
 
 ###############################################################################
