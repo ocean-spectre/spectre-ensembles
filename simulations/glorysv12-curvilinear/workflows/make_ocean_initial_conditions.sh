@@ -7,15 +7,12 @@
 #SBATCH --error=./spectre_ics.out
 
 
+HOST_DATADIR=/group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
 ###############################################################################################
-#   Setup the software environment
+# Run the script to download ERA5 data
 ###############################################################################################
-source ./galapagos_env.sh 
-module list
-
-###############################################################################################
-# Run the script to generate ocean boundary conditions
-###############################################################################################
-python ${spectre_ensembles}/spectre_utils/mk_initial_conditions.py ${spectre_ensembles}/etc/glorys-1-12.yaml
+srun --container-image=ghcr.io/ocean-spectre/spectre-150-ensembles/spectre-utils:latest \
+     --container-mounts=$(pwd):/workspace,${HOST_DATADIR}:/data \
+     python /opt/spectre_utils/mk_initial_conditions.py /workspace/etc/config.yaml
 
 ###############################################################################

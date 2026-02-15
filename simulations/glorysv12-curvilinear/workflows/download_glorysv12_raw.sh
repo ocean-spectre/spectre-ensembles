@@ -7,15 +7,11 @@
 #SBATCH --error=./spectre_glorysv12_raw.out
 
 
-###############################################################################################
-#   Setup the software environment
-###############################################################################################
-source ./galapagos_env.sh 
-module list
+HOST_DATADIR=/group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
 
 ###############################################################################################
-# Run the script to generate ocean boundary conditions
+# Run the script to download Glorysv12 data
 ###############################################################################################
-python ${spectre_ensembles}/spectre_utils/download_glorys12_raw.py ${spectre_ensembles}/etc/glorys-v12.yaml
-
-###############################################################################
+srun --container-image=ghcr.io/ocean-spectre/spectre-150-ensembles/spectre-utils:latest \
+     --container-mounts=$(pwd):/workspace,${HOST_DATADIR}:/data \
+     python /opt/spectre_utils/download_glorys12_raw.py /workspace/etc/config.yaml

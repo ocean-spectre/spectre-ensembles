@@ -7,16 +7,10 @@
 #SBATCH --error=./spectre_cheapaml.out
 
 
+HOST_DATADIR=/group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
 ###############################################################################################
-#   Setup the software environment
+# Run the script to download make the cheapaml boundary conditions
 ###############################################################################################
-source ./galapagos_env.sh 
-module list
-conda env list
-
-###############################################################################################
-# Run the script to generate ocean boundary conditions
-###############################################################################################
-python ${spectre_ensembles}/spectre_utils/mk_cheapaml_conditions.py ${spectre_ensembles}/etc/glorys-v12.yaml
-
-###############################################################################
+srun --container-image=ghcr.io/ocean-spectre/spectre-150-ensembles/spectre-utils:latest \
+     --container-mounts=$(pwd):/workspace,${HOST_DATADIR}:/data \
+     python /opt/spectre_utils/mk_cheapaml_conditions.py /workspace/etc/config.yaml
