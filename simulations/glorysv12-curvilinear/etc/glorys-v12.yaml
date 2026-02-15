@@ -1,10 +1,10 @@
 name: spectre-glorysv12
 description: |
-  Glorys v12 on 1/12 degree resolution for the years 2003-2015. This configuration is mainly used for model to model adapation (NEMO to MITgcm)
+  Glorys v12 on 1/12 degree resolution for the years 2003-2015, but run with the MITgcm.
 
-working_directory: /group/tdgs/joe/spectre-150-ensembles/glorysv12-curvilinear-15year
-#simulation_directory: /group/tdgs/joe/spectre-150-ensembles/simulations/glorysv12-curvilinear
-simulation_directory: /mnt/beegfs/spectre-ensembles/glorysv12-curvilinear
+# References path inside the container
+working_directory: /data
+simulation_directory: /workspace
 
 refine_factor: 1
 
@@ -67,7 +67,6 @@ domain:
     max: 10000.0
   time:
     start: "2002-07-01"
-    #end: "2003-06-30"
     end: "2017-06-30"
 
 simulation:
