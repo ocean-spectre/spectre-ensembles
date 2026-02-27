@@ -1,8 +1,10 @@
 # Packages
  &PACKAGES
- useOBCS=.FALSE.,
- useKPP=.FALSE.,
+ useOBCS=.TRUE.,
+ useKPP=.TRUE.,
  useCHEAPAML=.FALSE.,
- useMNC=.FALSE.,
+ useMNC=.TRUE.,
  useDIAGNOSTICS=.FALSE.,
+ useCAL=.TRUE.,
+ useEXF=.TRUE,
  &end

@@ -9,7 +9,15 @@
 #SBATCH --error=./spectre_bcs.out
 
 
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+    SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
+    SCRIPT_DIR=$(dirname "$(readlink -f "$SCRIPT_PATH")")
+    SIMULATION_DIR=$(dirname $SCRIPT_DIR)
+else
+    # Fallback for when running the script outside of a Slurm job
+    SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+fi
+
 source $SCRIPT_DIR/env.sh
 
 ###############################################################################################

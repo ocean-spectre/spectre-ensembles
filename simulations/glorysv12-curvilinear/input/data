@@ -43,17 +43,14 @@
  nIter0=0,
  baseTime=0.0,
 # End at end of day 365
-# endTime=31536000.0,
- endTime=120.0
+ endTime=31536000.0,
  deltaT=120.0,
  abEps=0.01,
  pChkptFreq=31536000.0, 
  chkptFreq=3153600.0,
  dumpFreq=120.0,
  monitorSelect=2,
- monitorFreq=120.0,
-# monitorFreq=3600.0,
- periodicExternalForcing=.FALSE.,
+ monitorFreq=3600.0,
 # Daily forced
 # externForcingPeriod=86400.0,
 # 365 day year

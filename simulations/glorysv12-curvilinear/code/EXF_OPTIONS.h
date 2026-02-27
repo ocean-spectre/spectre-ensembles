@@ -12,6 +12,7 @@ CEOP
 
 #ifndef EXF_OPTIONS_H
 #define EXF_OPTIONS_H
+#endif
 #include "PACKAGES_CONFIG.h"
 #include "CPP_OPTIONS.h"
 

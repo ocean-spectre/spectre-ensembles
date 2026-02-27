@@ -51,7 +51,7 @@ def get_glorys12_data(daterange, xmin, xmax, ymin, ymax, var):
     import xarray as xr
 
     datasets = {}
-    ds = xr.open_dataset(datamap[var])
+    ds = xr.open_dataset(datamap[var],engine='pydap')
 
     region = (ds.nav_lon > xmin) & (ds.nav_lon < xmax) & (ds.nav_lat > ymin) & (ds.nav_lat < ymax)
     indices = np.argwhere(region.values)

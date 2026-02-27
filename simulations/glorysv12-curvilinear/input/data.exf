@@ -1,5 +1,5 @@
 ! -----------------------------------------------------------------------------
-! data.exf -- example for ERA-Interim 6h, 0.75deg, and a curvilinear model grid
+! data.exf -- example for ERA-Interim 3h, 0.25deg, and a curvilinear model grid
 ! Edit file names, dates, periods, and the lon/lat metadata to match your files.
 ! -----------------------------------------------------------------------------
 
@@ -25,111 +25,116 @@
 
 &EXF_NML_02
   ! --- filenames, startdates and periods (seconds) ---
-  ! Wind components (10 m)
-  uwindfile       = 'uwind.bin',
-  uwindstartdate1 = 20020701,
-  uwindstartdate2 = 000000,
-  uwindperiod     = 10800.0,     ! 3 hours
-  uwind_lon0 = -90.0 
-  uwind_lon_inc = 0.25
-  uwind_lat0 = 20.0
-  uwind_lat_inc = 0.25
-  uwind_nlon = 321
-  uwind_nlat = 161
 
-  vwindfile       = 'vwind.bin',
-  vwindstartdate1 = 20020701,
-  vwindstartdate2 = 000000,
-  vwindperiod     = 10800.0,
-  vwind_lon0 = -90.0 
-  vwind_lon_inc = 0.25
-  vwind_lat0 = 20.0
-  vwind_lat_inc = 0.25
-  vwind_nlon = 321
-  vwind_nlat = 161
+  ! Wind components (10 m)
+  uwindfile        = 'uwind.bin',
+  uwindstartdate1  = 20020701,
+  uwindstartdate2  = 000000,
+  uwindperiod      = 10800.0,
+
+  vwindfile        = 'vwind.bin',
+  vwindstartdate1  = 20020701,
+  vwindstartdate2  = 000000,
+  vwindperiod      = 10800.0,
 
   ! 2-m air temperature (K)
-  atempfile       = 'atemp.bin',
-  atempstartdate1 = 20020701,
-  atempstartdate2 = 000000,
-  atempperiod     = 10800.0,
-  atemp_lon0 = -90.0 
-  atemp_lon_inc = 0.25
-  atemp_lat0 = 20.0
-  atemp_lat_inc = 0.25
-  atemp_nlon = 321
-  atemp_nlat = 161
+  atempfile        = 'atemp.bin',
+  atempstartdate1  = 20020701,
+  atempstartdate2  = 000000,
+  atempperiod      = 10800.0,
 
   ! 2-m specific humidity (kg/kg)
-  aqhfile         = 'aqh.bin',
-  aqhstartdate1   = 20020701,
-  aqhstartdate2   = 000000,
-  aqhperiod       = 10800.0,
-  aqh_lon0 = -90.0 
-  aqh_lon_inc = 0.25
-  aqh_lat0 = 20.0
-  aqh_lat_inc = 0.25
-  aqh_nlon = 321
-  aqh_nlat = 161
+  aqhfile          = 'aqh.bin',
+  aqhstartdate1    = 20020701,
+  aqhstartdate2    = 000000,
+  aqhperiod        = 10800.0,
 
-  ! shortwave radiation
-  swdownfile      = 'swdown.bin',
-  swdownstartdate1= 20020701,
-  swdownstartdate2= 000000,
-  swdownperiod    = 10800.0,
-  swdown_lon0 = -90.0 
-  swdown_lon_inc = 0.25
-  swdown_lat0 = 20.0
-  swdown_lat_inc = 0.25
-  swdown_nlon = 321
-  swdown_nlat = 161
+  ! Shortwave radiation
+  swdownfile       = 'swdown.bin',
+  swdownstartdate1 = 20020701,
+  swdownstartdate2 = 000000,
+  swdownperiod     = 10800.0,
 
   ! Longwave radiation
-  lwdownfile      = 'lwdown.bin',
-  lwdownstartdate1= 20020701,
-  lwdownstartdate2= 000000,
-  lwdownperiod    = 10800.0,
-  lwdown_lon0 = -90.0 
-  lwdown_lon_inc = 0.25
-  lwdown_lat0 = 20.0
-  lwdown_lat_inc = 0.25
-  lwdown_nlon = 321
-  lwdown_nlat = 161
+  lwdownfile       = 'lwdown.bin',
+  lwdownstartdate1 = 20020701,
+  lwdownstartdate2 = 000000,
+  lwdownperiod     = 10800.0,
 
   ! Precipitation
-  precipfile      = 'precip.bin',
-  precipstartdate1= 20020701,
-  precipstartdate2= 000000,
-  precipperiod    = 10800.0,
-  precip_lon0 = -90.0 
-  precip_lon_inc = 0.25
-  precip_lat0 = 20.0
-  precip_lat_inc = 0.25
-  precip_nlon = 321
-  precip_nlat = 161
+  precipfile       = 'precip.bin',
+  precipstartdate1 = 20020701,
+  precipstartdate2 = 000000,
+  precipperiod     = 10800.0,
 
   ! Evaporation
-  evapfile      = 'evap.bin',
-  evapstartdate1= 20020701,
-  evapstartdate2= 000000,
-  evapperiod    = 10800.0,
-  evap_lon0 = -90.0 
-  evap_lon_inc = 0.25
-  evap_lat0 = 20.0
-  evap_lat_inc = 0.25
-  evap_nlon = 321
-  evap_nlat = 161
+  evapfile         = 'evap.bin',
+  evapstartdate1   = 20020701,
+  evapstartdate2   = 000000,
+  evapperiod       = 10800.0,
 
   ! Runoff
-  runofffile      = 'runoff.bin',
-  runoffstartdate1= 20020701,
-  runoffstartdate2= 000000,
-  runoffperiod    = 10800.0,
-  runoff_lon0 = -90.0 
-  runoff_lon_inc = 0.25
-  runoff_lat0 = 20.0
-  runoff_lat_inc = 0.25
-  runoff_nlon = 321
-  runoff_nlat = 161
+  !runofffile       = 'runoff.bin',
+  !runoffstartdate1 = 20020701,
+  !runoffstartdate2 = 000000,
+  !runoffperiod     = 10800.0,
 /
-  
+
+&EXF_NML_03
+  ! climatological relaxation fields (climsst, climsss, etc.) -- unused here
+/
+
+&EXF_NML_04
+  ! --- input grid metadata for EXF interpolation (requires ALLOW_EXF_INTERPOLATION) ---
+
+  uwind_lon0   = -90.0,  uwind_lon_inc  = 0.25,
+  uwind_lat0   =  20.0,  uwind_lat_inc  = 0.25,
+  uwind_nlon   = 321,    uwind_nlat     = 161,
+
+  vwind_lon0   = -90.0,  vwind_lon_inc  = 0.25,
+  vwind_lat0   =  20.0,  vwind_lat_inc  = 0.25,
+  vwind_nlon   = 321,    vwind_nlat     = 161,
+
+  atemp_lon0   = -90.0,  atemp_lon_inc  = 0.25,
+  atemp_lat0   =  20.0,  atemp_lat_inc  = 0.25,
+  atemp_nlon   = 321,    atemp_nlat     = 161,
+
+  aqh_lon0     = -90.0,  aqh_lon_inc    = 0.25,
+  aqh_lat0     =  20.0,  aqh_lat_inc    = 0.25,
+  aqh_nlon     = 321,    aqh_nlat       = 161,
+
+  swdown_lon0  = -90.0,  swdown_lon_inc = 0.25,
+  swdown_lat0  =  20.0,  swdown_lat_inc = 0.25,
+  swdown_nlon  = 321,    swdown_nlat    = 161,
+
+  lwdown_lon0  = -90.0,  lwdown_lon_inc = 0.25,
+  lwdown_lat0  =  20.0,  lwdown_lat_inc = 0.25,
+  lwdown_nlon  = 321,    lwdown_nlat    = 161,
+
+  precip_lon0  = -90.0,  precip_lon_inc = 0.25,
+  precip_lat0  =  20.0,  precip_lat_inc = 0.25,
+  precip_nlon  = 321,    precip_nlat    = 161,
+
+  evap_lon0    = -90.0,  evap_lon_inc   = 0.25,
+  evap_lat0    =  20.0,  evap_lat_inc   = 0.25,
+  evap_nlon    = 321,    evap_nlat      = 161,
+
+  runoff_lon0  = -90.0,  runoff_lon_inc = 0.25,
+  runoff_lat0  =  20.0,  runoff_lat_inc = 0.25,
+  runoff_nlon  = 321,    runoff_nlat    = 161,
+/
+&EXF_NML_OBCS
+  useOBCSYearlyFields  = .FALSE.,
+
+  obcsNstartdate1 = 20020701,  obcsNstartdate2 = 000000,
+  obcsNperiod     = 86400.0,   obcsNrepCycle   = 0.0,
+
+  obcsSstartdate1 = 20020701,  obcsSstartdate2 = 000000,
+  obcsSperiod     = 86400.0,   obcsSrepCycle   = 0.0,
+
+  obcsEstartdate1 = 20020701,  obcsEstartdate2 = 000000,
+  obcsEperiod     = 86400.0,   obcsErepCycle   = 0.0,
+
+  obcsWstartdate1 = 20020701,  obcsWstartdate2 = 000000,
+  obcsWperiod     = 86400.0,   obcsWrepCycle   = 0.0,
+/

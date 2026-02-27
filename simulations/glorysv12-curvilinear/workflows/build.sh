@@ -7,16 +7,31 @@
 #SBATCH --error=%x-%A.out
 
 
-###############################################################################################
-#   Setup the software environment
-###############################################################################################
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+    SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
+    SCRIPT_DIR=$(dirname "$(readlink -f "$SCRIPT_PATH")")
+    SIMULATION_DIR=$(dirname $SCRIPT_DIR)
+else
+    # Fallback for when running the script outside of a Slurm job
+    SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+fi
+
+source $SCRIPT_DIR/env.sh
+
+echo "======================================="
+echo ""
+echo " Using simulation directory : ${SIMULATION_DIR}"
+echo " Using MITgcm base image    : ${MITGCM_BASE_IMG}"
+echo ""
+echo "======================================="
 
 ###############################################################################################
-# Run the script to generate ocean boundary conditions
+# Run the script to build the mitgcm
 ###############################################################################################
 
-srun --container-image=ghcr.io/fluidnumerics/mitgcm-containers/gcc-openmpi:latest \
-     --container-mounts=$(pwd):/workspace \
-     /opt/util/build.sh
+srun --container-image=$MITGCM_BASE_IMG \
+     --container-mounts=$SIMULATION_DIR:/workspace:rw \
+     --container-writable \
+     /bin/bash -c "source /opt/spack-environment/activate.sh && /opt/util/build.sh"
 
 ###############################################################################
