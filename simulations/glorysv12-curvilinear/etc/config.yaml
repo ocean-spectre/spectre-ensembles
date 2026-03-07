@@ -30,23 +30,26 @@ atmosphere:
       mitgcm_name: "atemp"
     - era_name: "total_precipitation"
       mitgcm_name: "precip"
-    - era_name: "mean_surface_downward_short_wave_radiation_flux"
+    - era_name: "surface_solar_radiation_downwards"
       mitgcm_name: "swdown"
-    - era_name: "mean_surface_net_long_wave_radiation_flux"
+      scale_factor: 2.7778E-04
+    - era_name: "surface_thermal_radiation_downwards"
       mitgcm_name: "lwdown"
+      scale_factor: 2.7778E-04
     - era_name: "mean_sea_level_pressure"
       mitgcm_name: "pressure"
     - era_name: "runoff"
       mitgcm_name: "runoff" 
     - era_name: "evaporation"
       mitgcm_name: "evap"
+    - era_name: "surface_pressure"
+      mitgcm_name: "sp"
   computed_variables:
     - mitgcm_name: "aqh"
       era_name: "q"
       function: "specific_humdity_from_dewpoint"
   years: [2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017]
   prefix: "era5"
-  cheapaml: True
 
 domain:
   mpi:

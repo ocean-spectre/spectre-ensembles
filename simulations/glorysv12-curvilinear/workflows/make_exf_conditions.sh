@@ -2,9 +2,9 @@
 #SBATCH -n1
 #SBATCH -c32
 #SBATCH --nodelist=franklin
-#SBATCH --job-name=spectre_cheapaml
-#SBATCH --output=./spectre_cheapaml.out
-#SBATCH --error=./spectre_cheapaml.out
+#SBATCH --job-name=spectre_exf
+#SBATCH --output=./spectre_exf.out
+#SBATCH --error=./spectre_exf.out
 
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
@@ -18,8 +18,8 @@ fi
 source $SCRIPT_DIR/env.sh
 
 ###############################################################################################
-# Run the script to download make the cheapaml boundary conditions
+# Run the script to download make the exf boundary conditions
 ###############################################################################################
 srun --container-image=$SPECTRE_UTILS_IMG \
      --container-mounts=${SCRIPT_DIR}/../:/workspace,${HOST_DATADIR}:/data \
-     python /opt/spectre_utils/mk_cheapaml_conditions.py /workspace/etc/config.yaml
+     python /opt/spectre_utils/mk_exf_conditions.py /workspace/etc/config.yaml

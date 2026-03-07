@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 
 
 def cli():
@@ -65,3 +66,42 @@ def from_copernicus(dataset_id, variables, start_date, end_date, min_long, max_l
         'Z': {'center': 'zc'}})
 
     return ds_full, grid
+
+
+def load_atm_dataset(working_directory, prefix, years, atm_vars, t1, t2):
+    """Load ERA5 atmospheric variables per MITgcm name, rename, and apply optional scale factors.
+
+    Each variable's files are loaded separately so that the single data variable
+    in each netCDF can be renamed to its ``mitgcm_name`` and any ``scale_factor``
+    from the config can be applied before the variables are merged.
+    Duplicate ``mitgcm_name`` entries (e.g. from config copy-paste) are skipped.
+    """
+    import xarray as xr
+
+    seen = set()
+    sub_datasets = []
+    for var in atm_vars:
+        mitgcm_name = var["mitgcm_name"]
+        if mitgcm_name in seen:
+            continue
+        seen.add(mitgcm_name)
+
+        scale_factor = var.get("scale_factor")
+        files = [f"{working_directory}/{prefix}_{mitgcm_name}_{year}.nc" for year in years]
+        for f in files:
+            import os
+            if not os.path.exists(f):
+                print(f"Missing file: {f}", file=sys.stderr)
+                sys.exit(1)
+
+        sub_ds = xr.open_mfdataset(files, combine="by_coords", parallel=True).sel(
+            valid_time=slice(t1, t2)
+        )
+        data_vars = list(sub_ds.data_vars)
+        if len(data_vars) == 1 and data_vars[0] != mitgcm_name:
+            sub_ds = sub_ds.rename({data_vars[0]: mitgcm_name})
+        if scale_factor is not None:
+            sub_ds[mitgcm_name] = sub_ds[mitgcm_name] * scale_factor
+        sub_datasets.append(sub_ds)
+
+    return xr.merge(sub_datasets)
