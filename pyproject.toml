@@ -33,7 +33,7 @@ dependencies = [
   "xarray==2025.6.1",
   "xgcm==0.8.1",
   "zarr==3.0.8",
-  "metpy==*"
+  "MetPy==1.7.1"
 ]
 [project.urls]
 Homepage = "https://github.com/ocean-spectre/spectra-150-ensembles"
