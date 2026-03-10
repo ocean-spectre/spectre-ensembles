@@ -1,10 +1,9 @@
 """
 QC review of EXF atmospheric forcing fields.
 
-Loads the ERA5 xarray dataset (same config-driven pipeline as
-mk_exf_conditions.py), computes derived variables, runs physical
-range / consistency / temporal checks, verifies binary file sizes, and
-writes a Markdown report plus three diagnostic figures to:
+Loads the written binary forcing files, runs physical range / consistency /
+temporal checks, verifies binary file sizes, and writes a Markdown report
+plus three diagnostic figures to:
 
     <simulation_directory>/review/atmosphere/
         report.md
@@ -22,9 +21,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from datetime import datetime, timezone
-
-from metpy.calc import specific_humidity_from_dewpoint
-from metpy.units import units as metpy_units
 
 from spectre_utils import common
 
@@ -216,22 +212,8 @@ def main():
     os.makedirs(review_dir, exist_ok=True)
 
     # ------------------------------------------------------------------
-    # Load dataset
+    # Build ordered list of all mitgcm names (configured + computed)
     # ------------------------------------------------------------------
-    print("Loading ERA5 dataset...")
-    ds = common.load_atm_dataset(working_directory, prefix, years, atm_vars, t1, t2)
-
-    if "sp" in ds and "d2m" in ds:
-        d2m_celsius = ds["d2m"] - 273.15
-        ds["aqh"] = specific_humidity_from_dewpoint(
-            ds["sp"] * metpy_units.Pa, d2m_celsius * metpy_units.degC
-        )
-
-    nt = ds.sizes["valid_time"]
-    ny = ds.sizes.get("latitude")
-    nx = ds.sizes.get("longitude")
-
-    # Ordered list of all mitgcm names (configured + computed), deduplicated
     seen: set[str] = set()
     all_names: list[str] = []
     for var in atm_vars:
@@ -244,6 +226,18 @@ def main():
         if n not in seen:
             seen.add(n)
             all_names.append(n)
+
+    # ------------------------------------------------------------------
+    # Load binary forcing files
+    # ------------------------------------------------------------------
+    print("Loading EXF binary files...")
+    ds = common.load_exf_binaries(
+        simulation_input_dir, all_names, working_directory, prefix, years, atm_vars, t1, t2
+    )
+
+    nt = ds.sizes["valid_time"]
+    ny = ds.sizes.get("latitude")
+    nx = ds.sizes.get("longitude")
 
     # ------------------------------------------------------------------
     # Diagnostic figures

@@ -7,8 +7,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegWriter
 from datetime import datetime
-from metpy.calc import specific_humidity_from_dewpoint
-from metpy.units import units
 
 from spectre_utils import common
 
@@ -106,15 +104,9 @@ def main():
     t1 = datetime.strptime(config["domain"]["time"]["start"], "%Y-%m-%d")
     t2 = datetime.strptime(config["domain"]["time"]["end"], "%Y-%m-%d")
 
-    print("Loading dataset...")
-    ds = common.load_atm_dataset(working_directory, prefix, years, atm_vars, t1, t2)
-
-    if "sp" in ds and "d2m" in ds:
-        d2m_celsius = ds["d2m"] - 273.15
-        ds["aqh"] = specific_humidity_from_dewpoint(ds["sp"] * units.Pa, d2m_celsius * units.degC)
-
     animations_dir = os.path.join(simulation_directory, "animations", "atmosphere")
     os.makedirs(animations_dir, exist_ok=True)
+    simulation_input_dir = os.path.join(simulation_directory, "input")
 
     # Collect all variable names to animate (configured + computed), deduplicated
     seen = set()
@@ -129,6 +121,11 @@ def main():
         if n not in seen:
             seen.add(n)
             to_animate.append(n)
+
+    print("Loading EXF binary files...")
+    ds = common.load_exf_binaries(
+        simulation_input_dir, to_animate, working_directory, prefix, years, atm_vars, t1, t2
+    )
 
     for name in to_animate:
         if name not in ds:

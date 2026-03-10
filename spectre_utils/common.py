@@ -68,6 +68,54 @@ def from_copernicus(dataset_id, variables, start_date, end_date, min_long, max_l
     return ds_full, grid
 
 
+def load_exf_binaries(simulation_input_dir, var_names, working_directory, prefix, years, atm_vars, t1, t2):
+    """Load EXF binary files into a labelled xarray Dataset.
+
+    Coordinates (time, latitude, longitude) are extracted from the ERA5 NetCDF
+    source files (metadata only — no data are read from them).  The binary data
+    are memory-mapped so only the portions actually accessed are read into RAM.
+    """
+    import xarray as xr
+    import numpy as np
+    import os
+
+    # Obtain grid coordinates from the first available NetCDF variable.
+    coord_ds = None
+    for var in atm_vars:
+        mitgcm_name = var["mitgcm_name"]
+        files = [f"{working_directory}/{prefix}_{mitgcm_name}_{year}.nc" for year in years]
+        if all(os.path.exists(f) for f in files):
+            coord_ds = xr.open_mfdataset(files, combine="by_coords").sel(
+                valid_time=slice(t1, t2)
+            )
+            break
+    if coord_ds is None:
+        raise FileNotFoundError("No ERA5 NetCDF files found for coordinate extraction.")
+
+    times = coord_ds["valid_time"].values
+    lats = coord_ds["latitude"].values
+    lons = coord_ds["longitude"].values
+    coord_ds.close()
+
+    nt, ny, nx = len(times), len(lats), len(lons)
+
+    data_vars = {}
+    for name in var_names:
+        bin_path = os.path.join(simulation_input_dir, f"{name}.bin")
+        if not os.path.exists(bin_path):
+            print(f"Warning: binary file not found, skipping: {bin_path}", file=sys.stderr)
+            continue
+        arr = np.memmap(bin_path, dtype=">f4", mode="r", shape=(nt, ny, nx))
+        data_vars[name] = xr.DataArray(
+            arr,
+            dims=["valid_time", "latitude", "longitude"],
+            coords={"valid_time": times, "latitude": lats, "longitude": lons},
+            name=name,
+        )
+
+    return xr.Dataset(data_vars)
+
+
 def load_atm_dataset(working_directory, prefix, years, atm_vars, t1, t2):
     """Load ERA5 atmospheric variables per MITgcm name, rename, and apply optional scale factors.
 
