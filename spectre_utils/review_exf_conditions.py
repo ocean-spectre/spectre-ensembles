@@ -46,24 +46,44 @@ PHYSICAL_BOUNDS: dict[str, tuple[float, float]] = {
 # Variables that should be non-negative after any scale factor
 NON_NEGATIVE = {"swdown", "lwdown", "precip", "runoff", "aqh"}
 
+# Number of time steps processed at once for memory-intensive operations.
+# ERA5 is hourly so 744 ≈ one month.
+TIME_CHUNK = 744
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _var_stats(da: xr.DataArray) -> dict:
-    """Compute global min/mean/max and count of non-finite values (lazy-safe)."""
-    arr = da.values.astype(np.float64)
-    n_bad = int(np.sum(~np.isfinite(arr)))
-    valid = arr[np.isfinite(arr)]
-    if valid.size == 0:
-        return dict(min=np.nan, mean=np.nan, max=np.nan, n_bad=n_bad, n=arr.size)
+    """Compute global min/mean/max and count of non-finite values in time chunks."""
+    nt = da.sizes["valid_time"]
+    n_bad = 0
+    n_total = 0
+    gmin = np.inf
+    gmax = -np.inf
+    gsum = 0.0
+
+    for i in range(0, nt, TIME_CHUNK):
+        chunk = da.isel(valid_time=slice(i, i + TIME_CHUNK)).values.astype(np.float64)
+        n_total += chunk.size
+        finite = np.isfinite(chunk)
+        n_bad += int((~finite).sum())
+        valid = chunk[finite]
+        if valid.size > 0:
+            gmin = min(gmin, float(valid.min()))
+            gmax = max(gmax, float(valid.max()))
+            gsum += float(valid.sum())
+
+    n_valid = n_total - n_bad
+    if n_valid == 0:
+        return dict(min=np.nan, mean=np.nan, max=np.nan, n_bad=n_bad, n=n_total)
     return dict(
-        min=float(valid.min()),
-        mean=float(valid.mean()),
-        max=float(valid.max()),
+        min=gmin if np.isfinite(gmin) else np.nan,
+        mean=gsum / n_valid,
+        max=gmax if np.isfinite(gmax) else np.nan,
         n_bad=n_bad,
-        n=int(arr.size),
+        n=n_total,
     )
 
 
@@ -166,9 +186,32 @@ def _make_histograms(ds: xr.Dataset, var_names: list[str], out_path: str) -> Non
 
     for idx, name in enumerate(present):
         ax = axes[idx // ncols][idx % ncols]
-        vals = ds[name].values.ravel()
-        vals = vals[np.isfinite(vals)]
-        ax.hist(vals, bins=120, color="steelblue", edgecolor="none", density=True)
+
+        # Determine bin range from known physical bounds or the first time chunk.
+        if name in PHYSICAL_BOUNDS:
+            lo, hi = PHYSICAL_BOUNDS[name]
+        else:
+            first = ds[name].isel(valid_time=slice(0, TIME_CHUNK)).values.ravel()
+            first = first[np.isfinite(first)]
+            lo = float(first.min()) if first.size > 0 else 0.0
+            hi = float(first.max()) if first.size > 0 else 1.0
+
+        bins = np.linspace(lo, hi, 121)
+        counts = np.zeros(120, dtype=np.float64)
+
+        nt = ds[name].sizes["valid_time"]
+        for i in range(0, nt, TIME_CHUNK):
+            chunk = ds[name].isel(valid_time=slice(i, i + TIME_CHUNK)).values.ravel()
+            chunk = chunk[np.isfinite(chunk)]
+            c, _ = np.histogram(chunk, bins=bins)
+            counts += c
+
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+        bin_width = bins[1] - bins[0]
+        total = counts.sum()
+        density = counts / (total * bin_width) if total > 0 else counts
+        ax.bar(bin_centers, density, width=bin_width, color="steelblue", edgecolor="none")
+
         var_units = ds[name].attrs.get("units", "")
         ax.set_xlabel(f"{name} [{var_units}]" if var_units else name, fontsize=8)
         ax.set_ylabel("Density", fontsize=8)
@@ -264,7 +307,8 @@ def main():
             stat_rows.append((name, "—", "—", "—", "—", "—"))
             continue
 
-        st = _var_stats(ds[name])
+        da = ds[name]
+        st = _var_stats(da)
         checks: list[tuple[bool, str]] = []
 
         # 1. NaN / Inf
@@ -290,7 +334,11 @@ def main():
 
         # 3. Non-negative where required
         if name in NON_NEGATIVE:
-            n_neg = int((ds[name] < 0).sum().compute().item())
+            n_neg = 0
+            _nt = da.sizes["valid_time"]
+            for _i in range(0, _nt, TIME_CHUNK):
+                _chunk = da.isel(valid_time=slice(_i, _i + TIME_CHUNK)).values
+                n_neg += int((_chunk < 0).sum())
             if n_neg == 0:
                 checks.append((True, "All values ≥ 0"))
             else:
@@ -331,8 +379,14 @@ def main():
 
     # Dewpoint ≤ air temperature
     if "d2m" in ds and "atemp" in ds:
-        n_viol = int((ds["d2m"] > ds["atemp"]).sum().compute().item())
-        n_total = int(ds["d2m"].size)
+        n_viol = 0
+        n_total = 0
+        nt = ds["d2m"].sizes["valid_time"]
+        for _i in range(0, nt, TIME_CHUNK):
+            _d2m   = ds["d2m"].isel(valid_time=slice(_i, _i + TIME_CHUNK)).values
+            _atemp = ds["atemp"].isel(valid_time=slice(_i, _i + TIME_CHUNK)).values
+            n_viol += int((_d2m > _atemp).sum())
+            n_total += _d2m.size
         ok = n_viol == 0
         msg = (
             "Dewpoint ≤ air temperature everywhere"

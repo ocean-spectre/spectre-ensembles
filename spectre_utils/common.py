@@ -116,6 +116,103 @@ def load_exf_binaries(simulation_input_dir, var_names, working_directory, prefix
     return xr.Dataset(data_vars)
 
 
+def load_obc_binaries(simulation_input_dir, working_directory, config):
+    """Load ocean boundary condition binary files into a dict of labelled DataArrays.
+
+    Returns a mapping ``{(var, boundary): xr.DataArray}`` where:
+      - ``var``      ∈ {"U", "V", "T", "S", "Eta"}
+      - ``boundary`` ∈ {"south", "north", "west", "east"}
+
+    Coordinates (time, depth, and boundary-parallel position as longitude or
+    latitude) are extracted from the raw glorys12 NetCDF files.  The binary
+    data are memory-mapped so only accessed portions are read into RAM.
+    """
+    import xarray as xr
+    import numpy as np
+    import os
+    import glob as _glob
+
+    i0 = config.get("domain", {}).get("longitude", {}).get("start", 2)
+    i1 = config.get("domain", {}).get("longitude", {}).get("end", -2)
+    j0 = config.get("domain", {}).get("latitude",  {}).get("start", 1)
+    j1 = config.get("domain", {}).get("latitude",  {}).get("end",  -1)
+    prefix = config.get("ocean", {}).get("prefix", "glorysv12")
+
+    t_files = sorted(_glob.glob(f"{working_directory}/{prefix}_T_glorys12_raw.*.nc"))
+    if not t_files:
+        raise FileNotFoundError(f"No glorys12 T files found in {working_directory}")
+
+    # One file for static coords (depth, nav_lon, nav_lat, grid size).
+    one_ds = xr.open_dataset(t_files[0])
+    nz = one_ds.sizes["deptht"]
+    ny = one_ds.sizes["y"]
+    nx = one_ds.sizes["x"]
+    depth   = one_ds["deptht"].values
+    nav_lon = one_ds["nav_lon"].values   # (ny, nx)
+    nav_lat = one_ds["nav_lat"].values   # (ny, nx)
+    one_ds.close()
+
+    # Full time axis from all T files (lazy — no data read).
+    all_ds = xr.open_mfdataset(t_files, combine="by_coords")
+    times = all_ds["time_counter"].values
+    all_ds.close()
+    nt = len(times)
+
+    # Resolve negative indices to absolute positions.
+    i1_abs = nx + i1 if i1 < 0 else i1   # = nx - 2
+    j1_abs = ny + j1 if j1 < 0 else j1   # = ny - 1
+
+    # 1-D geographic coordinates along each boundary.
+    # South/north: position varies in x (longitude-like).
+    lon_sn   = nav_lon[j0, i0:i1_abs]       # V, T, S, Eta
+    lon_sn_u = nav_lon[j0, i0:i1_abs - 1]   # U (narrower by 1; C-grid stagger)
+    lat_sn   = nav_lat[j0, i0:i1_abs]
+    lat_sn_u = nav_lat[j0, i0:i1_abs - 1]
+    # West/east: position varies in y (latitude-like).
+    lon_we = nav_lon[j0:j1_abs, i0]
+    lat_we = nav_lat[j0:j1_abs, i0]
+
+    # (shape, pos_dim_name, pos_coord) keyed by (var, boundary).
+    _specs = {}
+    for bnd in ("south", "north"):
+        _specs[("U",   bnd)] = ((nt, nz, len(lon_sn_u)), "lon", lon_sn_u)
+        _specs[("V",   bnd)] = ((nt, nz, len(lon_sn)),   "lon", lon_sn)
+        _specs[("T",   bnd)] = ((nt, nz, len(lon_sn)),   "lon", lon_sn)
+        _specs[("S",   bnd)] = ((nt, nz, len(lon_sn)),   "lon", lon_sn)
+        _specs[("Eta", bnd)] = ((nt,     len(lon_sn)),   "lon", lon_sn)
+    for bnd in ("west", "east"):
+        _specs[("U",   bnd)] = ((nt, nz, len(lat_we)), "lat", lat_we)
+        _specs[("V",   bnd)] = ((nt, nz, len(lat_we)), "lat", lat_we)
+        _specs[("T",   bnd)] = ((nt, nz, len(lat_we)), "lat", lat_we)
+        _specs[("S",   bnd)] = ((nt, nz, len(lat_we)), "lat", lat_we)
+        _specs[("Eta", bnd)] = ((nt,     len(lat_we)), "lat", lat_we)
+
+    result = {}
+    for (var, bnd), (shape, pos_name, pos_coord) in _specs.items():
+        bin_path = os.path.join(simulation_input_dir, f"{var}.{bnd}.bin")
+        if not os.path.exists(bin_path):
+            print(f"Warning: binary file not found, skipping: {bin_path}", file=sys.stderr)
+            continue
+        arr = np.memmap(bin_path, dtype=">f4", mode="r", shape=shape)
+        if len(shape) == 3:   # time × depth × position
+            da = xr.DataArray(
+                arr,
+                dims=["time", "depth", pos_name],
+                coords={"time": times, "depth": depth, pos_name: pos_coord},
+                name=f"{var}_{bnd}",
+            )
+        else:                  # time × position (Eta)
+            da = xr.DataArray(
+                arr,
+                dims=["time", pos_name],
+                coords={"time": times, pos_name: pos_coord},
+                name=f"{var}_{bnd}",
+            )
+        result[(var, bnd)] = da
+
+    return result
+
+
 def load_atm_dataset(working_directory, prefix, years, atm_vars, t1, t2):
     """Load ERA5 atmospheric variables per MITgcm name, rename, and apply optional scale factors.
 
