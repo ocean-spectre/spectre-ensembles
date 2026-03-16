@@ -9,3 +9,7 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONPATH="/opt"
 COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=build /opt /opt
+# Install FFmpeg and other necessary libraries
+RUN apt-get update -y && \
+    apt-get install -y ffmpeg libsm6 libxext6 && \
+    rm -rf /var/lib/apt/lists/*
