@@ -26,6 +26,9 @@ def _open_var(working_directory, prefix, mitgcm_name, years, t1, t2):
     data_vars = list(ds.data_vars)
     if len(data_vars) == 1 and data_vars[0] != mitgcm_name:
         ds = ds.rename({data_vars[0]: mitgcm_name})
+    # ERA5 latitude is stored north-to-south (60→20 N). Flip to south-to-north
+    # so the binary layout matches data.exf: lat0=20.0, lat_inc=+0.25 (j=0=20N).
+    ds = ds.isel(latitude=slice(None, None, -1))
     return ds
 
 
