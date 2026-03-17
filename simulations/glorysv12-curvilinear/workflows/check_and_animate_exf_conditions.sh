@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -n1
-#SBATCH -c64
-#SBATCH --job-name=spectre_exf
-#SBATCH --output=./spectre_exf.out
-#SBATCH --error=./spectre_exf.out
+#SBATCH -c16
+#SBATCH --job-name=spectre_exf_check
+#SBATCH --output=./spectre_exf_check.out
+#SBATCH --error=./spectre_exf_check.out
 
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
@@ -17,8 +17,15 @@ fi
 source $SCRIPT_DIR/env.sh
 
 ###############################################################################################
-# Run the script to download make the exf boundary conditions
+# Run QC review of EXF atmospheric forcing fields
 ###############################################################################################
 srun --container-image=$SPECTRE_UTILS_IMG \
      --container-mounts=${HOME}:${HOME},${SCRIPT_DIR}/../:/workspace,${HOST_DATADIR}:/data \
-     python /opt/spectre_utils/mk_exf_conditions.py /workspace/etc/config.yaml
+     python /opt/spectre_utils/review_exf_conditions.py /workspace/etc/config.yaml
+
+###############################################################################################
+# Animate EXF atmospheric forcing fields
+###############################################################################################
+srun --container-image=$SPECTRE_UTILS_IMG \
+     --container-mounts=${HOME}:${HOME},${SCRIPT_DIR}/../:/workspace,${HOST_DATADIR}:/data \
+     python /opt/spectre_utils/animate_exf_conditions.py /workspace/etc/config.yaml

@@ -5,7 +5,7 @@
 #SBATCH --output=%x-%A.out
 #SBATCH --error=%x-%A.out
 
-export RUN_DIR="demo/"
+export RUN_DIR="new/"
 
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
