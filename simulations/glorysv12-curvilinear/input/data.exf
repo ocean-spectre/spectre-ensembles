@@ -5,7 +5,7 @@
 
 &EXF_NML_01
   ! General EXF runtime switches
-  useExfCheckRange     = .TRUE.,    ! sanity checks on input ranges
+  useExfCheckRange     = .FALSE.,   ! disabled — warnings are pre-clamp; windstressmax clamps stress at 2.0 N/m²
   useExfYearlyFields   = .FALSE.,   ! we use single (not yearly-suffixed) files
   twoDigitYear         = .FALSE.,
   repeatPeriod         = 0.0,       ! no global repeat
@@ -14,10 +14,10 @@
   exf_scal_BulkCdn     = 1.0,
   ! Grid/rotation/wind options for curvilinear grids:
   readStressOnAgrid    = .FALSE.,   ! we read winds (uwind/vwind) not stresses by default
-  rotateStressOnAgrid  = .TRUE.,    ! rotate stress
+  rotateStressOnAgrid  = .FALSE.,   ! winds are pre-rotated to model grid by mk_exf_conditions.py
   readStressOnCgrid    = .FALSE.,
   useAtmWind           = .TRUE.,    ! use uwind/vwind to compute stress (and rotate them)
-  useRelativeWind      = .FALSE.,   ! Do we want this on ??
+  useRelativeWind      = .FALSE.,
   hu                   = 10.0,      ! height (m) of wind observations (10 m)
   ht                   = 2.0,       ! height (m) of temp/humidity (2 m)
   zref                 = 10.0,      ! reference height (10 m)
@@ -85,43 +85,9 @@
 /
 
 &EXF_NML_04
-  ! --- input grid metadata for EXF interpolation (requires ALLOW_EXF_INTERPOLATION) ---
-
-  uwind_lon0   = -90.0,  uwind_lon_inc  = 0.25,
-  uwind_lat0   =  20.0,  uwind_lat_inc  = 0.25,
-  uwind_nlon   = 321,    uwind_nlat     = 161,
-
-  vwind_lon0   = -90.0,  vwind_lon_inc  = 0.25,
-  vwind_lat0   =  20.0,  vwind_lat_inc  = 0.25,
-  vwind_nlon   = 321,    vwind_nlat     = 161,
-
-  atemp_lon0   = -90.0,  atemp_lon_inc  = 0.25,
-  atemp_lat0   =  20.0,  atemp_lat_inc  = 0.25,
-  atemp_nlon   = 321,    atemp_nlat     = 161,
-
-  aqh_lon0     = -90.0,  aqh_lon_inc    = 0.25,
-  aqh_lat0     =  20.0,  aqh_lat_inc    = 0.25,
-  aqh_nlon     = 321,    aqh_nlat       = 161,
-
-  swdown_lon0  = -90.0,  swdown_lon_inc = 0.25,
-  swdown_lat0  =  20.0,  swdown_lat_inc = 0.25,
-  swdown_nlon  = 321,    swdown_nlat    = 161,
-
-  lwdown_lon0  = -90.0,  lwdown_lon_inc = 0.25,
-  lwdown_lat0  =  20.0,  lwdown_lat_inc = 0.25,
-  lwdown_nlon  = 321,    lwdown_nlat    = 161,
-
-  precip_lon0  = -90.0,  precip_lon_inc = 0.25,
-  precip_lat0  =  20.0,  precip_lat_inc = 0.25,
-  precip_nlon  = 321,    precip_nlat    = 161,
-
-  evap_lon0    = -90.0,  evap_lon_inc   = 0.25,
-  evap_lat0    =  20.0,  evap_lat_inc   = 0.25,
-  evap_nlon    = 321,    evap_nlat      = 161,
-
-  runoff_lon0  = -90.0,  runoff_lon_inc = 0.25,
-  runoff_lat0  =  20.0,  runoff_lat_inc = 0.25,
-  runoff_nlon  = 321,    runoff_nlat    = 161,
+  ! All EXF fields are pre-interpolated to the model grid by
+  ! mk_exf_conditions.py.  No EXF interpolation metadata needed.
+  ! Wind vectors are pre-rotated to model-grid (i,j) directions.
 /
 &EXF_NML_OBCS
   useOBCSYearlyFields  = .FALSE.,
