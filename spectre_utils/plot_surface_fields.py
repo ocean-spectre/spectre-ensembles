@@ -57,27 +57,33 @@ def read_model_grid(horizgridfile, Nx, Ny):
     return fields[0, :Ny, :Nx], fields[1, :Ny, :Nx]
 
 
-def get_tile_layout(run_dir, nPx, nPy):
+def get_tile_layout(run_dir, nPx, nPy, sNx=96, sNy=53):
     """Build a mapping from (tile_py, tile_px) → MNC directory + tile file suffix.
 
-    MNC directories are numbered 0001..N for PIDs 0..N-1. Each contains
-    grid.t<NNN>.nc. We read the grid to get the tile's position.
+    Uses the X/Y coordinate indices in each tile's grid file to determine
+    the tile's position in the global grid, avoiding assumptions about
+    MNC directory numbering.
     """
     _import_xr()
     layout = {}
     mnc_dirs = sorted(glob.glob(os.path.join(run_dir, "mnc_*_*/")))
+    seen_positions = set()
     for d in mnc_dirs:
         grid_files = glob.glob(os.path.join(d, "grid.t*.nc"))
         if not grid_files:
             continue
         gf = grid_files[0]
-        # Extract directory index (PID + 1)
-        dir_idx = int(os.path.basename(d.rstrip("/")).split("_")[-1])
-        pid = dir_idx - 1
-        tile_py = pid // nPx
-        tile_px = pid % nPx
+        ds = _xr.open_dataset(gf)
+        # Global index offsets from the X/Y coordinates
+        x0 = int(ds["X"].values[0])
+        y0 = int(ds["Y"].values[0])
+        ds.close()
+        tile_px = (x0 - 1) // sNx
+        tile_py = (y0 - 1) // sNy
         tile_suffix = os.path.basename(gf).replace("grid.", "").replace(".nc", "")
-        layout[(tile_py, tile_px)] = {"dir": d, "tile": tile_suffix}
+        if (tile_py, tile_px) not in seen_positions:
+            layout[(tile_py, tile_px)] = {"dir": d, "tile": tile_suffix}
+            seen_positions.add((tile_py, tile_px))
     return layout
 
 

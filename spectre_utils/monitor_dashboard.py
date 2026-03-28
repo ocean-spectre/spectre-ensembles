@@ -513,7 +513,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_response(500)
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
-        elif self.path == "/plots":
+        elif self.path.startswith("/plots"):
             # Return JSON listing of available plots
             plots = scan_plots(self.plots_dir) if self.plots_dir else {}
             self.send_response(200)
@@ -521,9 +521,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(json.dumps(plots).encode())
-        elif self.path.startswith("/img/"):
+        elif self.path.split("?")[0].startswith("/img/"):
             # Serve plot images
-            fname = self.path[5:]  # strip /img/
+            fname = self.path.split("?")[0][5:]  # strip /img/ and query string
             if ".." in fname or "/" in fname:
                 self.send_response(403)
                 self.end_headers()
@@ -539,7 +539,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             else:
                 self.send_response(404)
                 self.end_headers()
-        elif self.path == "/archive":
+        elif self.path.startswith("/archive"):
             # Simple archive listing page
             plots = scan_plots(self.plots_dir) if self.plots_dir else {}
             html = self._render_archive(plots)

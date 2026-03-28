@@ -1,0 +1,32 @@
+# Bred vector ensemble configuration
+breeding:
+  n_members: 50
+  n_cycles: 8
+  cycle_length_days: 30
+  target_amplitude:
+    temperature_rms: 0.05  # °C — rescaling factor derived from T, applied to all fields
+
+# Model grid
+grid:
+  Nx: 768
+  Ny: 424
+  Nr: 50
+
+# Pickup file from the control run to use as the base state
+control:
+  pickup_prefix: "pickup"
+  # Iteration number of the pickup to use (set after spinup completes)
+  pickup_iter: null
+  run_dir: "../test-run-03252026"
+
+# MITgcm run parameters for each breeding member
+member_run:
+  deltaT: 360.0
+  # nTimeSteps = cycle_length_days * 86400 / deltaT
+  # 30 * 86400 / 360 = 7200
+  nTimeSteps: 7200
+
+# Output directories
+paths:
+  ensemble_dir: "."
+  member_prefix: "member"
