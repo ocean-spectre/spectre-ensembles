@@ -64,6 +64,36 @@ Configurable in `breed_config.yaml`.
 **8 breeding cycles**: Empirically sufficient for convergence. Monitor with
 `breed_vectors.py status` — the per-variable RMS should stabilize by cycle 5–6.
 
+### Time-varying forcing during breeding
+
+Breeding is performed under the full time-varying atmospheric (ERA5) and ocean
+boundary (GLORYS) forcing — not frozen or climatological forcing. This is the
+correct approach for two reasons:
+
+1. **Bred vectors should capture the growing modes of the actual system
+   trajectory.** The fastest-growing instabilities in the North Atlantic depend
+   on the seasonal forcing state — Gulf Stream separation behavior differs
+   between winter and summer, deep convection only occurs in winter, and summer
+   stratification modulates baroclinic instability. Breeding under realistic
+   forcing ensures the perturbations project onto modes that are actually
+   growing in the flow regime the ensemble will simulate.
+
+2. **The forcing cancels in the bred vector computation.** Both the control and
+   perturbed members see identical forcing. The bred vector (`member − control`)
+   isolates perturbation growth only — the common forcing signal drops out.
+   Time-varying forcing drives the background state but does not contaminate
+   the perturbation structure.
+
+If breeding were performed under constant (frozen) forcing, the perturbations
+would lock onto modes specific to that frozen state and need time to readjust
+when exposed to evolving forcing in the production ensemble — partially
+defeating the purpose of breeding.
+
+**Seasonal timing**: Ideally, start breeding from the same season as the
+production ensemble start date, so the bred vectors are tuned to the relevant
+flow regime. For multi-year ensembles this is a minor consideration — bred
+vectors readjust within the first few weeks of the production run regardless.
+
 ## Workflow
 
 ### Prerequisites
