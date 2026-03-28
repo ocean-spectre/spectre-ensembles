@@ -98,8 +98,11 @@ def stitch_field_2d(run_dir, file_prefix, timestep_str, var_name, layout,
             ds.close()
             continue
         data = ds[var_name]
-        if k is not None and "Z" in data.dims:
-            data = data.isel(Z=k)
+        # Select surface level — Z dim name varies (e.g. Zmd000050, Z, Zl)
+        if k is not None:
+            z_dims = [d for d in data.dims if d.startswith("Z")]
+            if z_dims:
+                data = data.isel({z_dims[0]: k})
         if "T" in data.dims:
             data = data.isel(T=-1)
         arr = data.values.squeeze()
@@ -107,7 +110,7 @@ def stitch_field_2d(run_dir, file_prefix, timestep_str, var_name, layout,
 
         j0 = py * sNy
         i0 = px * sNx
-        # Handle possible halo differences
+        # Trim staggered grid points (Xp1/Yp1) and halos to tile size
         ny_tile = min(arr.shape[-2], sNy)
         nx_tile = min(arr.shape[-1], sNx)
         global_field[j0:j0 + ny_tile, i0:i0 + nx_tile] = arr[:ny_tile, :nx_tile]
