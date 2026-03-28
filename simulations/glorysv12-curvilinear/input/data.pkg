@@ -4,7 +4,7 @@
  useKPP=.TRUE.,
  useCHEAPAML=.FALSE.,
  useMNC=.TRUE.,
- useDIAGNOSTICS=.FALSE.,
+ useDIAGNOSTICS=.TRUE.,
  useCAL=.TRUE.,
  useEXF=.TRUE,
  &end

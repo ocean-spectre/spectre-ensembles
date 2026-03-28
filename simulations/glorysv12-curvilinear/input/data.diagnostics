@@ -7,26 +7,29 @@
 #  frequency(n):< 0 : write snap-shot output every |frequency| seconds
 #               > 0 : write time-average output every frequency seconds
 #  timePhase(n)     : write at time = timePhase + multiple of |frequency|
-#    averagingFreq  : frequency (in s) for periodic averaging interval
-#    averagingPhase : phase     (in s) for periodic averaging interval
-#    repeatCycle    : number of averaging intervals in 1 cycle
 #  levels(:,n) : list of levels to write to file (Notes: declared as REAL)
 #                when this entry is missing, select all common levels of this list
 #  fields(:,n) : list of selected diagnostics fields (8.c) in outp.stream n
 #                (see "available_diagnostics.log" file for the full list of diags)
-#  missing_value(n) : missing value for real-type fields in output file "n"
-#  fileFlags(n)     : specific code (8c string) for output file "n"
 #--------------------
  &DIAGNOSTICS_LIST
-  diag_mnc     = .FALSE.,
-  fields(1:2,1) ='CH_QNET','CH_EmP',
-  fileName(1) = 'Cheapaml',
-  frequency(1) = -43200.0,
-  timePhase(1) = 0.0,
-  fields(1:5,2) ='TFLUX','SFLUX','oceFWflx','oceSflux','oceQnet',
-  fileName(2) = 'Thermo',
-  frequency(2) = -43200.0,
-  timePhase(2) = 0.0,
+  diag_mnc     = .TRUE.,
+
+# Stream 1: Daily snapshots of prognostic variables (3D)
+  fields(1:4,1) = 'THETA   ','SALT    ','UVEL    ','VVEL    ',
+  fileName(1) = 'state3D',
+  frequency(1) = -86400.0,
+
+# Stream 2: Daily snapshots of 2D prognostic fields
+  fields(1:2,2) = 'ETAN    ','WVEL    ',
+  fileName(2) = 'state2D',
+  frequency(2) = -86400.0,
+
+# Stream 3: Daily snapshots of surface fluxes
+  fields(1:5,3) = 'TFLUX   ','SFLUX   ','oceFWflx','oceSflux','oceQnet ',
+  fileName(3) = 'Thermo',
+  frequency(3) = -86400.0,
+
  &end
  &DIAG_STATIS_PARMS
  &end

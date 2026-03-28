@@ -40,7 +40,7 @@ C read evaporation from file
 
 
 C ** Interpolation / Vector rotation behavior ** 
-#define USE_EXF_INTERPOLATION
-#define EXF_INTERP_USE_DYNALLOC
+#undef USE_EXF_INTERPOLATION
+#undef EXF_INTERP_USE_DYNALLOC
 
 #endif

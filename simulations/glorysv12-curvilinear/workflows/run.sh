@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH -n64
 #SBATCH -c1
+#SBATCH --time=3-00:00:00
 #SBATCH --job-name=spectre_glorysv12_run
 #SBATCH --output=%x-%A.out
 #SBATCH --error=%x-%A.out
 
-export RUN_DIR="new/"
+export RUN_DIR="test-run-03252026/"
 
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
@@ -36,7 +37,7 @@ if [[ ! -d "$RUN_DIR" ]]; then
   srun --ntasks=1 \
        --mpi=pmix \
        --container-image=$MITGCM_BASE_IMG \
-       --container-mounts=$SIMULATION_DIR:/workspace:rw \
+       --container-mounts=$SIMULATION_INPUT_DIR:/input:ro,$SIMULATION_DIR:/workspace:rw \
        --container-env=RUN_DIR \
        /bin/bash -c /workspace/workflows/run_setup.sh
   echo ""

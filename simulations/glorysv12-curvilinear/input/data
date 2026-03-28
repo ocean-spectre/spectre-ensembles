@@ -42,13 +42,13 @@
  &PARM03
  nIter0=0,
  baseTime=0.0,
-# End at end of day 365
+# 1-year run (365 days)
  endTime=31536000.0,
- deltaT=120.0,
+ deltaT=360.0,
  abEps=0.01,
- pChkptFreq=31536000.0, 
- chkptFreq=3153600.0,
- dumpFreq=120.0,
+ pChkptFreq=15768000.0,
+ chkptFreq=2592000.0,
+ dumpFreq=0.0,
  monitorSelect=2,
  monitorFreq=3600.0,
 # Daily forced
