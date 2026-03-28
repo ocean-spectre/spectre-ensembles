@@ -17,6 +17,7 @@ Usage:
 import os
 import sys
 import re
+import json
 import argparse
 import yaml
 import numpy as np
@@ -311,7 +312,8 @@ def cmd_rescale(config, config_path, cycle):
     print(f"Control pickup (end of cycle {cycle}): {ctrl_pickup}")
     control_fields, meta = read_pickup(ctrl_pickup, Nx, Ny, Nr)
 
-    # Process each member
+    # Process each member and collect diagnostics for convergence log
+    cycle_diags = []
     for m in range(1, n_members + 1):
         member_dir = os.path.join(ensemble_dir, f"{paths['member_prefix']}_{m:03d}")
 
@@ -336,13 +338,32 @@ def cmd_rescale(config, config_path, cycle):
         with open(os.path.join(member_dir, "nIter0.txt"), "w") as f:
             f.write(str(end_iter))
 
+        diag["member"] = m
+        cycle_diags.append(diag)
+
         print(f"  Member {m:03d}: rescale={diag['rescale_factor']:.3f}, "
               f"T_rms={diag.get('Theta_rms', 0):.4f}°C, "
               f"S_rms={diag.get('Salt_rms', 0):.4f}, "
               f"U_rms={diag.get('Uvel_rms', 0):.4f} m/s, "
               f"Eta_rms={diag.get('EtaN_rms', 0):.4f} m")
 
-    print(f"\nCycle {cycle} rescaling complete")
+    # Write convergence log (append per cycle)
+    convergence_path = os.path.join(ensemble_dir, "convergence.json")
+    if os.path.exists(convergence_path):
+        with open(convergence_path, "r") as f:
+            convergence = json.load(f)
+    else:
+        convergence = {"cycles": []}
+
+    convergence["cycles"].append({
+        "cycle": cycle,
+        "iteration": end_iter,
+        "members": cycle_diags,
+    })
+    with open(convergence_path, "w") as f:
+        json.dump(convergence, f, indent=2)
+
+    print(f"\nCycle {cycle} rescaling complete — convergence log: {convergence_path}")
 
 
 def cmd_status(config, config_path, cycle):
