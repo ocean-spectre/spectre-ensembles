@@ -1,0 +1,55 @@
+# SPECTRE Agent System Configuration
+# Secrets (API keys, tokens) go in /etc/spectre-agents/env, NOT here.
+
+simulation:
+  base_dir: /mnt/beegfs/spectre-150-ensembles
+  sim_dir: simulations/glorysv12-curvilinear
+  run_dir_prefix: test-run
+
+grid:
+  Nx: 768
+  Ny: 424
+  Nr: 50
+  nPx: 8
+  nPy: 8
+
+discord:
+  channels:
+    status: simulation-status
+    decisions: decisions
+    alerts: alerts
+    plots: plots
+    logs: logs
+
+agents:
+  orchestrator:
+    model: claude-opus-4-6
+    max_tokens: 16384
+  workflow_runner:
+    model: claude-haiku-4-5
+    max_tokens: 4096
+  stdout_diagnostics:
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  model_output_review:
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  namelist_validator:
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  forcing_data_qc:
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  dashboard_manager:
+    model: claude-haiku-4-5
+    max_tokens: 4096
+  notify:
+    model: claude-haiku-4-5
+    max_tokens: 4096
+  web_research:
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+
+monitoring:
+  poll_interval_seconds: 60
+  dashboard_port: 8050
