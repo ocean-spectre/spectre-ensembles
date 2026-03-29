@@ -13,7 +13,7 @@
 #                (see "available_diagnostics.log" file for the full list of diags)
 #--------------------
  &DIAGNOSTICS_LIST
-  diag_mnc     = .TRUE.,
+  diag_mnc     = .FALSE.,
 
 # Stream 1: Daily snapshots of prognostic variables (3D)
   fields(1:4,1) = 'THETA   ','SALT    ','UVEL    ','VVEL    ',

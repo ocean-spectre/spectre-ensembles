@@ -2,6 +2,7 @@
 #SBATCH -n64
 #SBATCH -c1
 #SBATCH --time=3-00:00:00
+#SBATCH --nodelist=noether
 #SBATCH --job-name=spectre_glorysv12_run
 #SBATCH --output=%x-%A.out
 #SBATCH --error=%x-%A.out
@@ -37,7 +38,7 @@ if [[ ! -d "$RUN_DIR" ]]; then
   srun --ntasks=1 \
        --mpi=pmix \
        --container-image=$MITGCM_BASE_IMG \
-       --container-mounts=$SIMULATION_INPUT_DIR:/input:ro,$SIMULATION_DIR:/workspace:rw \
+       --container-mounts=$SIMULATION_INPUT_DIR:/input,$SIMULATION_DIR:/workspace:rw \
        --container-env=RUN_DIR \
        /bin/bash -c /workspace/workflows/run_setup.sh
   echo ""
@@ -50,7 +51,8 @@ fi
 # Launch mitgcm under enroot container
 ###############################################################################
 srun --mpi=pmix \
+     --cpu-bind=cores \
      --container-image=$MITGCM_BASE_IMG \
-     --container-mounts=$SIMULATION_DIR:/workspace:rw \
+     --container-mounts=$SIMULATION_INPUT_DIR:/input,$SIMULATION_DIR:/workspace:rw \
      --container-env=RUN_DIR \
      /bin/bash -c /workspace/workflows/run_worker.sh

@@ -46,11 +46,11 @@
  endTime=31536000.0,
  deltaT=360.0,
  abEps=0.01,
- pChkptFreq=15768000.0,
+ pChkptFreq=2592000.0,
  chkptFreq=2592000.0,
  dumpFreq=0.0,
  monitorSelect=2,
- monitorFreq=3600.0,
+ monitorFreq=21600.0,
 # Daily forced
 # externForcingPeriod=86400.0,
 # 365 day year
