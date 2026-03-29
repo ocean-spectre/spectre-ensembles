@@ -1,0 +1,30 @@
+[Unit]
+Description=SPECTRE Simulation Agent System (Discord bot + Claude agents)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joe
+Group=joe
+WorkingDirectory=/mnt/beegfs/spectre-150-ensembles
+ExecStart=/mnt/beegfs/spectre-150-ensembles/.venv/bin/python -m spectre_agents --config /mnt/beegfs/spectre-150-ensembles/spectre_agents_config.yaml
+Restart=on-failure
+RestartSec=30
+
+# Secrets
+EnvironmentFile=/etc/spectre-agents/env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spectre-agents
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/mnt/beegfs/spectre-150-ensembles /tmp /var/log
+PrivateTmp=no
+
+[Install]
+WantedBy=multi-user.target
