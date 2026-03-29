@@ -28,6 +28,7 @@ class DiscordChannels:
     alerts: str = "alerts"
     plots: str = "plots"
     logs: str = "logs"
+    knowledge: str = "ask-mitgcm"
 
 
 @dataclass
@@ -151,7 +152,7 @@ def load_config(config_path: str | Path | None = None) -> Config:
 
         discord = raw.get("discord", {})
         channels = discord.get("channels", {})
-        for attr in ("status", "decisions", "alerts", "plots", "logs"):
+        for attr in ("status", "decisions", "alerts", "plots", "logs", "knowledge"):
             if attr in channels:
                 setattr(cfg.discord_channels, attr, channels[attr])
 

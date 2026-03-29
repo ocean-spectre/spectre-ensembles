@@ -16,6 +16,7 @@ from discord import app_commands
 
 from spectre_agents.discord_bot.commands import setup_commands
 from spectre_agents.discord_bot.embeds import decision_embed
+from spectre_agents.discord_bot.knowledge import setup_knowledge_handler
 from spectre_agents.discord_bot.views import DecisionView
 
 if TYPE_CHECKING:
@@ -63,12 +64,17 @@ class SpectreBot(discord.Client):
         # Start the decision queue processor
         self._decision_task = asyncio.create_task(self._process_decision_queue())
 
+        # Register the knowledge Q&A handler for #ask-mitgcm
+        setup_knowledge_handler(self, self.config, self.ctx)
+        logger.info("Knowledge bot listening in #%s", self.config.discord_channels.knowledge)
+
         # Post startup message
         channel = await self.ctx.get_channel(self.config.discord_channels.status)
         if channel:
             await channel.send(
                 "**SPECTRE Agent System** online.\n"
-                "Use `/run start` to begin a simulation, `/run status` to check progress."
+                "Use `/run start` to begin a simulation, `/run status` to check progress.\n"
+                f"Ask questions in #**{self.config.discord_channels.knowledge}**."
             )
 
     async def on_error(self, event_method: str, *args, **kwargs) -> None:

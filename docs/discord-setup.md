@@ -45,6 +45,7 @@ Create these channels in your Discord server:
 | `#alerts` | Failure alerts and critical warnings |
 | `#plots` | Surface field PNGs, convergence plots |
 | `#logs` | Verbose agent activity (optional) |
+| `#ask-mitgcm` | Knowledge Q&A — ask about MITgcm, ERA5, oceanography, or the codebase |
 
 **Get your Guild (Server) ID:**
 - Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
@@ -176,6 +177,8 @@ journalctl -u spectre-agents -f
 
 ## Discord Commands Reference
 
+### Slash commands (simulation ops)
+
 | Command | Description |
 |---------|-------------|
 | `/run start` | Validate config, submit simulation, start monitoring |
@@ -193,6 +196,20 @@ journalctl -u spectre-agents -f
 | `/ensemble start` | Begin bred vector generation |
 | `/ensemble status` | Show ensemble convergence |
 | `/config [param]` | Show simulation configuration |
+
+### Knowledge Q&A (`#ask-mitgcm`)
+
+Just type a question in the `#ask-mitgcm` channel — no slash command needed.
+The bot answers using Claude with full context about:
+
+- **MITgcm**: parameters, packages, Fortran source, debugging
+- **ERA5 / GLORYS**: variable definitions, units, accumulation conventions
+- **This simulation**: grid, forcing, namelists, workflows, known gotchas
+- **Oceanography**: North Atlantic circulation, air-sea fluxes, ensemble methods
+- **HPC / SLURM**: job scheduling, containers, parallel I/O
+
+Long answers automatically create a thread to keep the channel clean.
+The bot can also search the web and read files in the repo for up-to-date answers.
 
 ## Agent Autonomy Levels
 

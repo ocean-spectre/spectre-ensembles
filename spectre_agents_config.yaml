@@ -20,6 +20,7 @@ discord:
     alerts: alerts
     plots: plots
     logs: logs
+    knowledge: ask-mitgcm
 
 agents:
   orchestrator:
