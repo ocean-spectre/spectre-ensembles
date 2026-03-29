@@ -12,11 +12,9 @@ grid:
   Ny: 424
   Nr: 50
 
-# Pickup file from the control run to use as the base state
+# Control run directory (relative to ensemble/)
+# Must contain a pickup at iteration 7200 (30 days from nIter0=0)
 control:
-  pickup_prefix: "pickup"
-  # Iteration number of the pickup to use (set after spinup completes)
-  pickup_iter: null
   run_dir: "../test-run-03252026"
 
 # MITgcm run parameters for each breeding member
@@ -28,5 +26,4 @@ member_run:
 
 # Output directories
 paths:
-  ensemble_dir: "."
   member_prefix: "member"

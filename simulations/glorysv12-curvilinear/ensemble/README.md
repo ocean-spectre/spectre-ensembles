@@ -23,24 +23,39 @@ far more realistic initial condition perturbations than random noise alone.
 
 ### Breeding cycle
 
+Each member has its own set of initial condition files (`T.init.bin`,
+`S.init.bin`, `U.init.bin`, `V.init.bin`, `Eta.init.bin`). The cycle operates
+on these IC files directly:
+
 ```
-Control:    ─────────────────────────────────────────────►
-                 │                    │
-                 │ perturb            │ rescale & perturb
-                 ▼                    ▼
-Member i:   ─────●════════════════════●════════════════════●───►
-                 cycle 0              cycle 1              cycle 2 ...
-                 (30 days)            (30 days)
+Control ICs:  T.init.bin, S.init.bin, U.init.bin, V.init.bin, Eta.init.bin
+                 │
+                 │  add perturbation (breed_vectors.py init)
+                 ▼
+Member ICs:   T.init.bin, S.init.bin, ... (in member_NNN/)
+                 │
+                 │  run MITgcm from nIter0=0 for 30 days
+                 ▼
+Member pickup at t=30 days (pickup.0000007200.data)
+                 │
+                 │  bred_vector = member_pickup - control_pickup
+                 │  rescale by target_RMS / actual_T_RMS
+                 │  new_IC = control_IC + rescaled_bred_vector
+                 ▼
+Member ICs:   overwritten with new perturbation → next cycle
 ```
 
-Each cycle:
-1. Member starts from `control_state + perturbation`
-2. Runs forward for 30 days (configurable)
-3. At end: `bred_vector = member_state - control_state`
-4. Rescale factor = `target_RMS / actual_RMS` (computed from temperature)
-5. **Same rescale factor applied to ALL variables** (T, S, U, V, SSH) to preserve
-   geostrophic and hydrostatic balance
-6. New perturbation: `control_state + rescale_factor × bred_vector`
+Key points:
+- Every cycle starts from **nIter0=0** — the member's IC files are the
+  perturbation mechanism, not pickup files
+- The **same forcing, grid, and namelist files** are shared across all members
+  (symlinked from the master input directory). Only the IC files differ.
+- Bred vectors are computed from the **pickup at t=30 days**, which captures
+  how the perturbation grew over the cycle
+- The **same rescale factor** (derived from temperature RMS) is applied to
+  all variables to preserve dynamical balance
+- For **production runs** after breeding converges, each member restarts from
+  its pickup at t=30 days (iteration 7200)
 
 ### Design choices
 
@@ -98,42 +113,57 @@ vectors readjust within the first few weeks of the production run regardless.
 
 ### Prerequisites
 
-- Completed control spinup run with at least one permanent pickup file
-- Set `pickup_iter` in `breed_config.yaml` (or leave null to auto-detect latest)
+- Completed control spinup run (1 year)
+- Control run must also be run from nIter0=0 for 30 days (same as members)
+  to produce the reference pickup for bred vector computation
 
 ### Steps
 
 ```bash
 cd simulations/glorysv12-curvilinear
 
-# 1. Initialize 50 perturbed pickups from the control state
+# 1. Initialize 50 perturbed IC files from the control ICs
 uv run python ../../spectre_utils/breed_vectors.py init ensemble/breed_config.yaml
 
-# 2. Run all 50 members for one breeding cycle (SLURM array job)
+# 2. Run all 50 members for one 30-day cycle (SLURM array job)
+#    Each member starts from nIter0=0 with its perturbed ICs
 sbatch --chdir=$(pwd) workflows/breed_vectors.sh
 
-# 3. After all members complete — compute bred vectors and rescale
+# 3. After all members complete — compute bred vectors and overwrite ICs
 uv run python ../../spectre_utils/breed_vectors.py rescale ensemble/breed_config.yaml --cycle 1
 
 # 4. Check convergence (per-variable RMS table)
-uv run python ../../spectre_utils/breed_vectors.py status ensemble/breed_config.yaml --cycle 1
+uv run python ../../spectre_utils/breed_vectors.py status ensemble/breed_config.yaml
 
-# 5. Repeat steps 2–4 for each cycle
-#    Update --cycle 2, 3, ... 8
+# 5. Repeat steps 2–4 for each cycle (2, 3, ... 8)
 ```
 
-### GCP deployment
+### Running the control alongside members
 
-Each member directory (`member_001/` through `member_050/`) is self-contained:
-- Perturbed pickup file (`.data` + `.meta`)
-- `nIter0.txt` with the starting iteration
+The control must also produce a pickup at iteration 7200 (30 days from nIter0=0)
+for the bred vector computation. This can be done:
+- As a separate single run with the same `data` settings as the members
+- On one of the 17 compute nodes alongside 2 members (3 sims per node)
+
+### Transitioning to production
+
+After breeding converges (cycle 5–8):
+1. Each member has a pickup at `member_NNN/run/pickup.0000007200.data`
+2. Copy this pickup to the member's production run directory
+3. Set `nIter0=7200` and full production `endTime`/`nTimeSteps`
+4. Run the production ensemble
+
+## GCP deployment
+
+Each member directory (`member_001/` through `member_050/`) contains:
+- `T.init.bin`, `S.init.bin`, `U.init.bin`, `V.init.bin`, `Eta.init.bin`
 
 To run on GCP:
-1. Copy the input deck and member pickups to each compute node's local disk
-2. Each member runs standard MITgcm with the member's pickup as the restart file
-3. After all members finish, copy pickups back and run the `rescale` step
-
-## GCP Cost Estimate
+1. Copy the master input deck to each compute node's local disk (one copy per node)
+2. Copy each member's IC files to the node
+3. Set up the member run directory: symlink master input, replace IC symlinks with copies
+4. Run MITgcm with `nIter0=0`, `nTimeSteps=7200`
+5. After all members finish, copy pickups back and run the `rescale` step
 
 ### Cluster configuration
 
@@ -143,28 +173,7 @@ To run on GCP:
 | Login | n1-standard-2 | 1 | SSH access, job submission |
 | Controller | n1-standard-2 | 1 | Slurm controller |
 
-### Compute requirements per cycle
-
-- 50 members ÷ 3 per node = **17 nodes** per cycle
-- 30 sim-days at 12–20 sim-days/wall-hr = **1.5–2.5 wall hours** per cycle
-- 8 cycles × 2.5 hrs = **~20 hours** total wall time (plus ~30 min rescaling between cycles)
-- Total compute: 17 nodes × 20 hrs = **340 node-hours** (conservative)
-
-### Local disk per node
-
-| Data | Size |
-|------|------|
-| EXF forcing (8 variables × 54 GB) | 432 GB |
-| OBC boundary files | 20 GB |
-| Grid, bathymetry, initial conditions | 2 GB |
-| Pickup files (3 members) | 6 GB |
-| Output headroom (diagnostics, pickups) | 40 GB |
-| **Total** | **~500 GB** |
-
-Recommend **1 TB pd-ssd** per compute node, or local NVMe SSD if available
-on the machine type.
-
-### Cost breakdown
+### Cost estimate
 
 | Item | On-demand | Spot (~70% discount) |
 |------|-----------|---------------------|
@@ -173,16 +182,16 @@ on the machine type.
 | n1-standard-2 × 2 × 24 hrs @ $0.095/hr | $5 | $5 |
 | **Total** | **~$3,400** | **~$1,100** |
 
-### Notes
+### Local disk per node
 
-- Spot/preemptible instances are viable since each breeding cycle is only
-  1.5–2.5 hours — short enough to avoid most preemptions
-- The 30-min rescaling step between cycles runs on a single node and is
-  negligible cost
-- Data transfer: ~500 GB input deck upload (one-time) + ~100 MB pickups per
-  cycle (negligible)
-- The control run must also advance 30 days per cycle to provide the reference
-  state — this can run on one of the 17 compute nodes
+| Data | Size |
+|------|------|
+| EXF forcing (8 variables × 54 GB) | 432 GB |
+| OBC boundary files | 20 GB |
+| Grid, bathymetry, other input | 5 GB |
+| Member IC files (3 members × 5 files × 130 MB) | 2 GB |
+| Output headroom (pickups) | 40 GB |
+| **Total** | **~500 GB** |
 
 ## Configuration
 
@@ -213,11 +222,19 @@ consider a shorter `cycle_length_days` to accelerate convergence.
 ```
 ensemble/
 ├── breed_config.yaml       # Breeding parameters
+├── convergence.json        # Per-cycle RMS diagnostics (written by rescale)
 ├── README.md               # This file
 ├── member_001/             # Member 1
-│   ├── pickup.NNNNNNNNNN.data
-│   ├── pickup.NNNNNNNNNN.meta
-│   └── nIter0.txt
+│   ├── T.init.bin          # Perturbed temperature IC
+│   ├── S.init.bin          # Perturbed salinity IC
+│   ├── U.init.bin          # Perturbed zonal velocity IC
+│   ├── V.init.bin          # Perturbed meridional velocity IC
+│   ├── Eta.init.bin        # Perturbed SSH IC
+│   └── run/                # MITgcm run directory (created by breed_vectors.sh)
+│       ├── *.bin → /input/ # Symlinks to master input (forcing, grid, OBC)
+│       ├── T.init.bin      # Copied (not symlinked) from member dir
+│       ├── data            # Member-specific (nIter0=0, nTimeSteps=7200)
+│       └── pickup.0000007200.data  # Output: state at t=30 days
 ├── member_002/
 │   └── ...
 └── member_050/

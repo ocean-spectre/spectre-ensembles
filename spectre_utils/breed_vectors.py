@@ -3,9 +3,16 @@ breed_vectors.py
 ================
 Bred vector ensemble generation for MITgcm.
 
+Works with initial condition binary files (T.init.bin, S.init.bin, etc.)
+rather than pickup files. Each breeding cycle:
+  1. Member starts from nIter0=0 with perturbed IC files
+  2. Runs forward 30 days, producing a pickup at the end
+  3. Bred vector = member_pickup - control_pickup (at t=30 days)
+  4. Rescale and overwrite the member's IC files for the next cycle
+
 Subcommands:
-    init     — Create N perturbed pickup files from a control pickup
-    rescale  — Compute bred vectors, rescale, write new perturbed pickups
+    init     — Create N perturbed IC files from control ICs
+    rescale  — Compute bred vectors from pickups, rescale, overwrite member ICs
     status   — Report per-variable RMS of bred vectors for each member
 
 Usage:
@@ -25,186 +32,92 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
-# MITgcm pickup file I/O
+# IC and pickup file definitions
 # ---------------------------------------------------------------------------
 
-# Standard pickup field order for MITgcm (with staggerTimeStep)
-# Each 3D field has Nr levels; each 2D field has 1 level.
-# Fields come in pairs: current + previous (Adams-Bashforth)
-PICKUP_FIELDS_3D = ["Uvel", "Vvel", "Theta", "Salt", "GuNm1", "GvNm1"]
-PICKUP_FIELDS_2D = ["EtaN", "dEtaHdt", "EtaH"]
+# Initial condition files: simple 3D or 2D arrays, big-endian float32
+IC_FILES = {
+    "T.init.bin": {"shape_type": "3d", "field": "Theta"},
+    "S.init.bin": {"shape_type": "3d", "field": "Salt"},
+    "U.init.bin": {"shape_type": "3d", "field": "Uvel"},
+    "V.init.bin": {"shape_type": "3d", "field": "Vvel"},
+    "Eta.init.bin": {"shape_type": "2d", "field": "EtaN"},
+}
 
-# Indices of the dynamically meaningful fields (not tendency terms)
-DYNAMIC_3D = {"Uvel": 0, "Vvel": 1, "Theta": 2, "Salt": 3}
-DYNAMIC_2D = {"EtaN": 0}
-
-
-def read_pickup_meta(meta_path):
-    """Parse pickup .meta file for dimensions and field list."""
-    with open(meta_path, "r") as f:
-        text = f.read()
-
-    dims_match = re.search(r"dimList\s*=\s*\[\s*([\d\s,]+)\]", text)
-    flds_match = re.search(r"fldList\s*=\s*\{([^}]+)\}", text)
-    nflds_match = re.search(r"nFlds\s*=\s*\[\s*(\d+)\s*\]", text)
-    nrec_match = re.search(r"nrecords\s*=\s*\[\s*(\d+)\s*\]", text)
-
-    dims = []
-    if dims_match:
-        nums = [int(x.strip()) for x in dims_match.group(1).split(",") if x.strip()]
-        dims = [nums[i] for i in range(0, len(nums), 3)]
-
-    fields = []
-    if flds_match:
-        fields = [s.strip().strip("'").strip() for s in flds_match.group(1).split("'") if s.strip().strip("'").strip()]
-
-    nflds = int(nflds_match.group(1)) if nflds_match else len(fields)
-    nrecs = int(nrec_match.group(1)) if nrec_match else nflds
-
-    return {"dims": dims, "fields": fields, "nflds": nflds, "nrecords": nrecs}
+# Pickup fields — used for reading the member state after a breeding cycle
+# MITgcm pickup with staggerTimeStep contains pairs: current + previous (AB)
+# We only need the current fields (first of each pair)
+PICKUP_FIELDS = [
+    ("Uvel", "3d"),
+    ("Vvel", "3d"),
+    ("Theta", "3d"),
+    ("Salt", "3d"),
+    ("GuNm1", "3d"),
+    ("GvNm1", "3d"),
+    ("EtaN", "2d"),
+    ("dEtaHdt", "2d"),
+    ("EtaH", "2d"),
+]
 
 
-def read_pickup(data_path, Nx, Ny, Nr):
-    """Read a full pickup .data file into a dict of numpy arrays keyed by field name."""
-    meta_path = data_path.replace(".data", ".meta")
-    meta = read_pickup_meta(meta_path)
-    fields = meta["fields"]
+# ---------------------------------------------------------------------------
+# I/O helpers
+# ---------------------------------------------------------------------------
 
-    raw = np.fromfile(data_path, dtype=">f8")  # pickups are float64
-    record_size_3d = Nx * Ny * Nr
-    record_size_2d = Nx * Ny
+def read_ic(path, Nx, Ny, Nr, shape_type):
+    """Read an initial condition binary file."""
+    if shape_type == "3d":
+        return np.fromfile(path, dtype=">f4").reshape(Nr, Ny, Nx)
+    else:
+        return np.fromfile(path, dtype=">f4").reshape(Ny, Nx)
 
-    result = {}
+
+def write_ic(path, data):
+    """Write an initial condition binary file."""
+    data.astype(">f4").tofile(path)
+
+
+def read_pickup_field(data_path, field_name, Nx, Ny, Nr):
+    """Read a single field from a pickup .data file.
+
+    Pickup files are float64, fields in the order defined by PICKUP_FIELDS.
+    """
+    raw = np.fromfile(data_path, dtype=">f8")
     offset = 0
-    for fname in fields:
-        # Determine if 3D or 2D from known field names
-        if any(fname.startswith(f3d) for f3d in ["Uvel", "Vvel", "Theta", "Salt", "GuNm", "GvNm",
-                                                    "PhiHyd", "dPhiHyd"]):
-            size = record_size_3d
-            shape = (Nr, Ny, Nx)
-        else:
-            size = record_size_2d
-            shape = (Ny, Nx)
-
-        result[fname] = raw[offset:offset + size].reshape(shape).copy()
+    for fname, ftype in PICKUP_FIELDS:
+        size = Nx * Ny * Nr if ftype == "3d" else Nx * Ny
+        shape = (Nr, Ny, Nx) if ftype == "3d" else (Ny, Nx)
+        if fname == field_name:
+            return raw[offset:offset + size].reshape(shape)
         offset += size
-
-    return result, meta
-
-
-def write_pickup(data_path, fields_dict, meta, Nx, Ny, Nr):
-    """Write a pickup .data file from a dict of arrays, preserving field order."""
-    arrays = []
-    for fname in meta["fields"]:
-        arrays.append(fields_dict[fname].ravel())
-    combined = np.concatenate(arrays)
-    combined.astype(">f8").tofile(data_path)
-
-    # Copy the .meta file as-is (structure unchanged)
-    meta_src = data_path.replace(".data", ".meta")
-    # Meta is already in place from the control — no need to rewrite
+    return None
 
 
 # ---------------------------------------------------------------------------
 # Perturbation and rescaling
 # ---------------------------------------------------------------------------
 
-def compute_rms(arr, mask=None):
-    """Compute RMS of an array, optionally with a mask."""
-    if mask is not None:
-        vals = arr[mask]
-    else:
-        vals = arr[arr != 0]  # exclude exact zeros (land)
+def compute_rms(arr):
+    """Compute RMS of non-zero elements."""
+    vals = arr[arr != 0]
     if len(vals) == 0:
         return 0.0
-    return np.sqrt(np.mean(vals ** 2))
+    return float(np.sqrt(np.mean(vals ** 2)))
 
 
-def create_random_perturbation(control_fields, Nx, Ny, Nr, target_temp_rms, rng):
-    """Create a perturbed pickup by adding scaled random noise to the control.
+def create_perturbation(control_ic, target_rms, rng):
+    """Add scaled random noise to a control IC field.
 
-    A single random field is generated for temperature. The noise is scaled
-    so that its RMS matches target_temp_rms. The same scaling factor is
-    applied to all other dynamic fields, with per-field random noise.
-    This creates perturbations with the right amplitude but no initial
-    dynamical balance — the breeding process will project these onto
-    balanced growing modes.
+    Returns perturbed field. Scale factor is derived from the temperature
+    field externally — this function applies a pre-computed scale.
     """
-    perturbed = {k: v.copy() for k, v in control_fields.items()}
-
-    # Create ocean mask from Theta (non-zero cells)
-    theta = control_fields["Theta"]
-    ocean_mask = theta != 0
-
-    # Generate random noise for temperature, compute scaling factor
-    noise_t = rng.standard_normal(theta.shape)
-    noise_t[~ocean_mask] = 0
-    raw_rms = compute_rms(noise_t, ocean_mask)
+    ocean_mask = control_ic != 0
+    noise = rng.standard_normal(control_ic.shape).astype(np.float32)
+    noise[~ocean_mask] = 0
+    raw_rms = compute_rms(noise)
     if raw_rms > 0:
-        scale = target_temp_rms / raw_rms
-    else:
-        scale = 0
-
-    # Apply scaled noise to temperature
-    perturbed["Theta"] = theta + scale * noise_t
-
-    # Apply independently-generated noise with same scale to other dynamic fields
-    for fname in ["Salt", "Uvel", "Vvel"]:
-        if fname in control_fields:
-            field = control_fields[fname]
-            mask = field != 0
-            noise = rng.standard_normal(field.shape)
-            noise[~mask] = 0
-            perturbed[fname] = field + scale * noise
-
-    # Small perturbation to EtaN
-    if "EtaN" in control_fields:
-        eta = control_fields["EtaN"]
-        mask = eta != 0
-        noise = rng.standard_normal(eta.shape)
-        noise[~mask] = 0
-        perturbed["EtaN"] = eta + scale * noise
-
-    return perturbed
-
-
-def compute_bred_vector_and_rescale(control_fields, member_fields, target_temp_rms):
-    """Compute bred vector (member - control), rescale by temperature RMS.
-
-    Returns the new perturbed fields (control + rescaled bred vector)
-    and diagnostic info.
-    """
-    # Compute bred vector
-    bred = {}
-    for fname in member_fields:
-        bred[fname] = member_fields[fname] - control_fields[fname]
-
-    # Compute temperature RMS of the bred vector
-    theta_bred = bred.get("Theta", np.zeros(1))
-    ocean_mask = control_fields["Theta"] != 0
-    actual_rms = compute_rms(theta_bred, ocean_mask)
-
-    if actual_rms > 0:
-        rescale_factor = target_temp_rms / actual_rms
-    else:
-        rescale_factor = 1.0
-
-    # Rescale ALL fields by the same factor (preserves dynamical balance)
-    new_perturbed = {}
-    for fname in control_fields:
-        if fname in bred:
-            new_perturbed[fname] = control_fields[fname] + rescale_factor * bred[fname]
-        else:
-            new_perturbed[fname] = control_fields[fname].copy()
-
-    # Per-variable RMS diagnostics
-    diag = {"rescale_factor": rescale_factor, "theta_rms_before": actual_rms}
-    for fname in ["Theta", "Salt", "Uvel", "Vvel", "EtaN"]:
-        if fname in bred:
-            mask = control_fields[fname] != 0 if fname != "EtaN" else None
-            diag[f"{fname}_rms"] = compute_rms(bred[fname], mask) * rescale_factor
-
-    return new_perturbed, diag
+        noise *= target_rms / raw_rms
+    return control_ic + noise
 
 
 # ---------------------------------------------------------------------------
@@ -212,142 +125,153 @@ def compute_bred_vector_and_rescale(control_fields, member_fields, target_temp_r
 # ---------------------------------------------------------------------------
 
 def cmd_init(config, config_path):
-    """Create initial perturbed pickup files for all members."""
+    """Create initial perturbed IC files for all members."""
     breed = config["breeding"]
     grid = config["grid"]
-    ctrl = config["control"]
-    paths = config["paths"]
+    paths_cfg = config["paths"]
 
     Nx, Ny, Nr = grid["Nx"], grid["Ny"], grid["Nr"]
     n_members = breed["n_members"]
     target_rms = breed["target_amplitude"]["temperature_rms"]
 
-    ensemble_dir = os.path.join(os.path.dirname(config_path), paths["ensemble_dir"])
+    ensemble_dir = os.path.dirname(os.path.abspath(config_path))
+    sim_input_dir = os.path.join(os.path.dirname(ensemble_dir), "input")
 
-    # Find control pickup
-    ctrl_run_dir = os.path.join(os.path.dirname(config_path), ctrl["run_dir"])
-    pickup_iter = ctrl["pickup_iter"]
-    if pickup_iter is None:
-        # Find the latest permanent pickup
-        import glob
-        pickups = sorted(glob.glob(os.path.join(ctrl_run_dir, "pickup.??????????.data")))
-        if not pickups:
-            print("Error: no pickup files found in control run directory", file=sys.stderr)
+    print(f"Control ICs from: {sim_input_dir}")
+    print(f"Target temperature RMS: {target_rms}°C")
+
+    # Read control ICs
+    control = {}
+    for fname, info in IC_FILES.items():
+        path = os.path.join(sim_input_dir, fname)
+        if not os.path.exists(path):
+            print(f"Error: {path} not found", file=sys.stderr)
             sys.exit(1)
-        pickup_data = pickups[-1]
-        pickup_iter = int(os.path.basename(pickup_data).split(".")[1])
-    else:
-        pickup_data = os.path.join(ctrl_run_dir, f"pickup.{pickup_iter:010d}.data")
+        control[info["field"]] = read_ic(path, Nx, Ny, Nr, info["shape_type"])
+        print(f"  {fname}: shape={control[info['field']].shape}")
 
-    pickup_meta = pickup_data.replace(".data", ".meta")
-    print(f"Control pickup: {pickup_data}")
-    print(f"  Iteration: {pickup_iter}")
-
-    # Read control pickup
-    control_fields, meta = read_pickup(pickup_data, Nx, Ny, Nr)
-    print(f"  Fields: {list(control_fields.keys())}")
-    print(f"  Theta range: [{control_fields['Theta'].min():.2f}, {control_fields['Theta'].max():.2f}]")
-
-    # Create perturbed pickups
+    # For each member: generate noise scaled to target_rms (from temperature),
+    # apply same scale factor to all variables
     for m in range(1, n_members + 1):
-        member_dir = os.path.join(ensemble_dir, f"{paths['member_prefix']}_{m:03d}")
+        member_dir = os.path.join(ensemble_dir, f"{paths_cfg['member_prefix']}_{m:03d}")
         os.makedirs(member_dir, exist_ok=True)
 
-        rng = np.random.default_rng(seed=42 + m)  # reproducible per member
-        perturbed = create_random_perturbation(control_fields, Nx, Ny, Nr, target_rms, rng)
+        rng = np.random.default_rng(seed=42 + m)
 
-        # Write perturbed pickup
-        out_data = os.path.join(member_dir, f"pickup.{pickup_iter:010d}.data")
-        out_meta = os.path.join(member_dir, f"pickup.{pickup_iter:010d}.meta")
-        write_pickup(out_data, perturbed, meta, Nx, Ny, Nr)
+        # Compute scale factor from temperature noise
+        theta = control["Theta"]
+        ocean_mask = theta != 0
+        noise_t = rng.standard_normal(theta.shape).astype(np.float32)
+        noise_t[~ocean_mask] = 0
+        raw_rms = compute_rms(noise_t)
+        scale = target_rms / raw_rms if raw_rms > 0 else 0
 
-        # Copy meta file
-        import shutil
-        shutil.copy2(pickup_meta, out_meta)
+        # Write perturbed ICs for all variables
+        for fname, info in IC_FILES.items():
+            field = control[info["field"]]
+            mask = field != 0
+            noise = rng.standard_normal(field.shape).astype(np.float32)
+            noise[~mask] = 0
+            perturbed = field + scale * noise
+            write_ic(os.path.join(member_dir, fname), perturbed)
 
-        # Write nIter0 for this member
-        niter0_file = os.path.join(member_dir, "nIter0.txt")
-        with open(niter0_file, "w") as f:
-            f.write(str(pickup_iter))
+        print(f"  Member {m:03d}: scale={scale:.6f}")
 
-        print(f"  Member {m:03d}: written to {member_dir}")
-
-    print(f"\nInitialized {n_members} perturbed members from iteration {pickup_iter}")
-    print(f"Target temperature RMS: {target_rms}°C")
+    print(f"\nInitialized {n_members} members")
 
 
 def cmd_rescale(config, config_path, cycle):
-    """Compute bred vectors and rescale after a breeding cycle."""
+    """Compute bred vectors from pickups, rescale, overwrite member ICs."""
     breed = config["breeding"]
     grid = config["grid"]
-    ctrl = config["control"]
-    paths = config["paths"]
+    ctrl_cfg = config["control"]
+    paths_cfg = config["paths"]
+    member_run_cfg = config["member_run"]
 
     Nx, Ny, Nr = grid["Nx"], grid["Ny"], grid["Nr"]
     n_members = breed["n_members"]
     target_rms = breed["target_amplitude"]["temperature_rms"]
-    nTimeSteps = config["member_run"]["nTimeSteps"]
+    nTimeSteps = member_run_cfg["nTimeSteps"]
 
-    ensemble_dir = os.path.join(os.path.dirname(config_path), paths["ensemble_dir"])
+    ensemble_dir = os.path.dirname(os.path.abspath(config_path))
+    ctrl_run_dir = os.path.join(os.path.dirname(ensemble_dir), ctrl_cfg["run_dir"])
 
-    # Control pickup at end of this cycle
-    ctrl_run_dir = os.path.join(os.path.dirname(config_path), ctrl["run_dir"])
+    # The pickup iteration at the end of the cycle (all members ran from
+    # nIter0=0 for nTimeSteps)
+    end_iter = nTimeSteps
+    pickup_name = f"pickup.{end_iter:010d}.data"
 
-    # Determine the iteration number at the end of this cycle
-    # First cycle starts from pickup_iter, each cycle adds nTimeSteps
-    pickup_iter = ctrl["pickup_iter"]
-    if pickup_iter is None:
-        import glob
-        pickups = sorted(glob.glob(os.path.join(ctrl_run_dir, "pickup.??????????.data")))
-        pickup_iter = int(os.path.basename(pickups[-1]).split(".")[1])
-
-    end_iter = pickup_iter + cycle * nTimeSteps
-
-    # Read control state at end of cycle
-    ctrl_pickup = os.path.join(ctrl_run_dir, f"pickup.{end_iter:010d}.data")
-    if not os.path.exists(ctrl_pickup):
-        print(f"Error: control pickup not found: {ctrl_pickup}", file=sys.stderr)
+    # Read control pickup at end of cycle
+    ctrl_pickup_path = os.path.join(ctrl_run_dir, pickup_name)
+    if not os.path.exists(ctrl_pickup_path):
+        print(f"Error: control pickup not found: {ctrl_pickup_path}", file=sys.stderr)
+        print(f"The control run must also have been run for {nTimeSteps} steps "
+              f"to produce this pickup.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Control pickup (end of cycle {cycle}): {ctrl_pickup}")
-    control_fields, meta = read_pickup(ctrl_pickup, Nx, Ny, Nr)
+    print(f"Control pickup: {ctrl_pickup_path}")
+    ctrl_fields = {}
+    for fname, info in IC_FILES.items():
+        pickup_field = info["field"]
+        data = read_pickup_field(ctrl_pickup_path, pickup_field, Nx, Ny, Nr)
+        if data is not None:
+            ctrl_fields[pickup_field] = data.astype(np.float32)
+            print(f"  {pickup_field}: shape={data.shape}")
 
-    # Process each member and collect diagnostics for convergence log
-    cycle_diags = []
-    for m in range(1, n_members + 1):
-        member_dir = os.path.join(ensemble_dir, f"{paths['member_prefix']}_{m:03d}")
-
-        # Read member pickup at end of cycle
-        member_pickup = os.path.join(member_dir, f"pickup.{end_iter:010d}.data")
-        if not os.path.exists(member_pickup):
-            print(f"  Member {m:03d}: SKIP — no pickup at iter {end_iter}")
-            continue
-
-        member_fields, _ = read_pickup(member_pickup, Nx, Ny, Nr)
-
-        # Compute bred vector and rescale
-        new_perturbed, diag = compute_bred_vector_and_rescale(
-            control_fields, member_fields, target_rms
+    # Read control ICs (for creating new perturbed ICs)
+    sim_input_dir = os.path.join(os.path.dirname(ensemble_dir), "input")
+    control_ics = {}
+    for fname, info in IC_FILES.items():
+        control_ics[info["field"]] = read_ic(
+            os.path.join(sim_input_dir, fname), Nx, Ny, Nr, info["shape_type"]
         )
 
-        # Write new perturbed pickup for next cycle
-        out_data = os.path.join(member_dir, f"pickup.{end_iter:010d}.data")
-        write_pickup(out_data, new_perturbed, meta, Nx, Ny, Nr)
+    # Process each member
+    cycle_diags = []
+    for m in range(1, n_members + 1):
+        member_dir = os.path.join(ensemble_dir, f"{paths_cfg['member_prefix']}_{m:03d}")
+        member_run_dir = os.path.join(member_dir, "run")
+        member_pickup = os.path.join(member_run_dir, pickup_name)
 
-        # Update nIter0
-        with open(os.path.join(member_dir, "nIter0.txt"), "w") as f:
-            f.write(str(end_iter))
+        if not os.path.exists(member_pickup):
+            print(f"  Member {m:03d}: SKIP — no pickup at {pickup_name}")
+            continue
 
-        diag["member"] = m
+        # Read member state at end of cycle
+        member_fields = {}
+        for fname, info in IC_FILES.items():
+            data = read_pickup_field(member_pickup, info["field"], Nx, Ny, Nr)
+            if data is not None:
+                member_fields[info["field"]] = data.astype(np.float32)
+
+        # Compute bred vector
+        bred = {}
+        for field_name in member_fields:
+            bred[field_name] = member_fields[field_name] - ctrl_fields[field_name]
+
+        # Compute rescale factor from temperature
+        theta_rms = compute_rms(bred["Theta"])
+        rescale = target_rms / theta_rms if theta_rms > 0 else 1.0
+
+        # Overwrite member IC files: control_IC + rescaled bred vector
+        for fname, info in IC_FILES.items():
+            field_name = info["field"]
+            new_ic = control_ics[field_name] + rescale * bred[field_name]
+            write_ic(os.path.join(member_dir, fname), new_ic)
+
+        # Diagnostics
+        diag = {"member": m, "rescale_factor": rescale, "theta_rms_before": theta_rms}
+        for field_name in bred:
+            diag[f"{field_name}_rms"] = compute_rms(bred[field_name]) * rescale
         cycle_diags.append(diag)
 
-        print(f"  Member {m:03d}: rescale={diag['rescale_factor']:.3f}, "
-              f"T_rms={diag.get('Theta_rms', 0):.4f}°C, "
-              f"S_rms={diag.get('Salt_rms', 0):.4f}, "
-              f"U_rms={diag.get('Uvel_rms', 0):.4f} m/s, "
-              f"Eta_rms={diag.get('EtaN_rms', 0):.4f} m")
+        print(f"  Member {m:03d}: rescale={rescale:.3f}, "
+              f"T={diag.get('Theta_rms', 0):.5f}°C, "
+              f"S={diag.get('Salt_rms', 0):.5f}, "
+              f"U={diag.get('Uvel_rms', 0):.5f} m/s, "
+              f"Eta={diag.get('EtaN_rms', 0):.5f} m")
 
-    # Write convergence log (append per cycle)
+    # Write convergence log
     convergence_path = os.path.join(ensemble_dir, "convergence.json")
     if os.path.exists(convergence_path):
         with open(convergence_path, "r") as f:
@@ -357,7 +281,7 @@ def cmd_rescale(config, config_path, cycle):
 
     convergence["cycles"].append({
         "cycle": cycle,
-        "iteration": end_iter,
+        "end_iter": end_iter,
         "members": cycle_diags,
     })
     with open(convergence_path, "w") as f:
@@ -367,49 +291,48 @@ def cmd_rescale(config, config_path, cycle):
 
 
 def cmd_status(config, config_path, cycle):
-    """Report per-variable RMS of current bred vectors."""
-    breed = config["breeding"]
-    grid = config["grid"]
-    ctrl = config["control"]
-    paths = config["paths"]
+    """Report per-variable RMS of bred vectors."""
+    ensemble_dir = os.path.dirname(os.path.abspath(config_path))
+    convergence_path = os.path.join(ensemble_dir, "convergence.json")
 
-    Nx, Ny, Nr = grid["Nx"], grid["Ny"], grid["Nr"]
-    n_members = breed["n_members"]
-    nTimeSteps = config["member_run"]["nTimeSteps"]
+    if not os.path.exists(convergence_path):
+        print("No convergence data yet.")
+        return
 
-    ensemble_dir = os.path.join(os.path.dirname(config_path), paths["ensemble_dir"])
-    ctrl_run_dir = os.path.join(os.path.dirname(config_path), ctrl["run_dir"])
+    with open(convergence_path, "r") as f:
+        convergence = json.load(f)
 
-    pickup_iter = ctrl["pickup_iter"]
-    if pickup_iter is None:
-        import glob
-        pickups = sorted(glob.glob(os.path.join(ctrl_run_dir, "pickup.??????????.data")))
-        pickup_iter = int(os.path.basename(pickups[-1]).split(".")[1])
+    if cycle is not None:
+        cycles = [c for c in convergence["cycles"] if c["cycle"] == cycle]
+    else:
+        cycles = convergence["cycles"]
 
-    end_iter = pickup_iter + cycle * nTimeSteps
-    ctrl_pickup = os.path.join(ctrl_run_dir, f"pickup.{end_iter:010d}.data")
-    control_fields, _ = read_pickup(ctrl_pickup, Nx, Ny, Nr)
-
-    print(f"Bred vector RMS at cycle {cycle} (iter {end_iter}):")
-    print(f"{'Member':>8s}  {'T (°C)':>10s}  {'S (PSU)':>10s}  {'U (m/s)':>10s}  {'V (m/s)':>10s}  {'Eta (m)':>10s}")
-    print("-" * 62)
-
-    for m in range(1, n_members + 1):
-        member_dir = os.path.join(ensemble_dir, f"{paths['member_prefix']}_{m:03d}")
-        member_pickup = os.path.join(member_dir, f"pickup.{end_iter:010d}.data")
-        if not os.path.exists(member_pickup):
+    for c in cycles:
+        members = c.get("members", [])
+        if not members:
             continue
-        member_fields, _ = read_pickup(member_pickup, Nx, Ny, Nr)
+        print(f"\nCycle {c['cycle']} (end iter {c['end_iter']}):")
+        print(f"{'Member':>8s}  {'T (°C)':>10s}  {'S (PSU)':>10s}  "
+              f"{'U (m/s)':>10s}  {'V (m/s)':>10s}  {'Eta (m)':>10s}  {'Rescale':>8s}")
+        print("-" * 72)
+        for d in members:
+            print(f"  {d['member']:03d}     "
+                  f"{d.get('Theta_rms', 0):10.5f}  "
+                  f"{d.get('Salt_rms', 0):10.5f}  "
+                  f"{d.get('Uvel_rms', 0):10.5f}  "
+                  f"{d.get('Vvel_rms', 0):10.5f}  "
+                  f"{d.get('EtaN_rms', 0):10.5f}  "
+                  f"{d.get('rescale_factor', 0):8.3f}")
 
-        rms = {}
-        for fname in ["Theta", "Salt", "Uvel", "Vvel", "EtaN"]:
-            if fname in member_fields and fname in control_fields:
-                diff = member_fields[fname] - control_fields[fname]
-                mask = control_fields[fname] != 0 if fname != "EtaN" else None
-                rms[fname] = compute_rms(diff, mask)
-
-        print(f"  {m:03d}     {rms.get('Theta', 0):10.5f}  {rms.get('Salt', 0):10.5f}  "
-              f"{rms.get('Uvel', 0):10.5f}  {rms.get('Vvel', 0):10.5f}  {rms.get('EtaN', 0):10.5f}")
+        # Ensemble mean
+        avg = lambda k: np.mean([d[k] for d in members if k in d])
+        print(f"  {'MEAN':>3s}     "
+              f"{avg('Theta_rms'):10.5f}  "
+              f"{avg('Salt_rms'):10.5f}  "
+              f"{avg('Uvel_rms'):10.5f}  "
+              f"{avg('Vvel_rms'):10.5f}  "
+              f"{avg('EtaN_rms'):10.5f}  "
+              f"{avg('rescale_factor'):8.3f}")
 
 
 # ---------------------------------------------------------------------------
@@ -420,16 +343,16 @@ def main():
     parser = argparse.ArgumentParser(description="Bred vector ensemble generation")
     sub = parser.add_subparsers(dest="command")
 
-    p_init = sub.add_parser("init", help="Create initial perturbed pickups")
+    p_init = sub.add_parser("init", help="Create initial perturbed ICs")
     p_init.add_argument("config", help="Path to breed_config.yaml")
 
     p_rescale = sub.add_parser("rescale", help="Compute bred vectors and rescale")
     p_rescale.add_argument("config", help="Path to breed_config.yaml")
-    p_rescale.add_argument("--cycle", type=int, required=True, help="Breeding cycle number")
+    p_rescale.add_argument("--cycle", type=int, required=True)
 
     p_status = sub.add_parser("status", help="Report bred vector RMS")
     p_status.add_argument("config", help="Path to breed_config.yaml")
-    p_status.add_argument("--cycle", type=int, required=True, help="Breeding cycle number")
+    p_status.add_argument("--cycle", type=int, default=None)
 
     args = parser.parse_args()
     if not args.command:

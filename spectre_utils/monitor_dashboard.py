@@ -1,13 +1,15 @@
 """
 monitor_dashboard.py
 ====================
-Live-updating MITgcm monitor dashboard.  Runs a lightweight HTTP server that
-parses STDOUT.0000 on each poll and pushes updated time series to the browser.
+Live-updating MITgcm monitor dashboard with multi-run support.
+
+Watches a simulation directory for run subdirectories containing STDOUT.0000.
+Each discovered run is selectable from a dropdown in the browser.
 
 Usage:
-    python monitor_dashboard.py <path-to-STDOUT.0000> [--port 8050] [--poll 30]
+    python monitor_dashboard.py <simulation_dir> [--port 8050] [--poll 30]
 
-Then open http://<hostname>:<port> in a browser.
+    simulation_dir: e.g. simulations/glorysv12-curvilinear/
 """
 
 import re
@@ -15,9 +17,10 @@ import sys
 import json
 import argparse
 import os
+import glob
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timedelta
-from functools import lru_cache
+from urllib.parse import urlparse, parse_qs
 
 # ---------------------------------------------------------------------------
 # Human-readable panel definitions
@@ -44,14 +47,18 @@ PANELS = [
 ]
 
 STAT_SUFFIXES = ["_max", "_mean", "_min", "_sd"]
+RAW_LABELS = {
+    "advcfl_uvel_max": "U", "advcfl_vvel_max": "V",
+    "advcfl_wvel_max": "W", "advcfl_W_hf_max": "W half",
+    "trAdv_CFL_u_max": "U", "trAdv_CFL_v_max": "V",
+    "trAdv_CFL_w_max": "W",
+}
 
 # ---------------------------------------------------------------------------
-# Incremental parser — only reads new bytes since last poll
+# Incremental parser
 # ---------------------------------------------------------------------------
 
 class StdoutWatcher:
-    """Incrementally parse %MON lines from a growing STDOUT file."""
-
     _pattern = re.compile(r'%MON\s+(\S+)\s+=\s+(\S+)')
 
     def __init__(self, path):
@@ -62,14 +69,12 @@ class StdoutWatcher:
         self._json_cache = None
 
     def poll(self):
-        """Read any new bytes appended since last call. Returns True if new records found."""
         try:
             size = os.path.getsize(self.path)
         except OSError:
             return False
         if size <= self._offset:
             return False
-
         new_records = 0
         with open(self.path, "r") as f:
             f.seek(self._offset)
@@ -91,69 +96,71 @@ class StdoutWatcher:
                     new_records += 1
                 self._current[name] = val
             self._offset = f.tell()
-
         if new_records > 0:
-            self._json_cache = None  # invalidate
+            self._json_cache = None
         return new_records > 0
 
 
-def get_slurm_info(stdout_path):
-    """Try to extract SLURM job info from the run environment."""
+# ---------------------------------------------------------------------------
+# Run discovery
+# ---------------------------------------------------------------------------
+
+def discover_runs(simulation_dir):
+    """Find subdirectories containing STDOUT.0000."""
+    runs = []
+    for d in sorted(os.listdir(simulation_dir)):
+        full = os.path.join(simulation_dir, d)
+        if os.path.isdir(full) and os.path.exists(os.path.join(full, "STDOUT.0000")):
+            runs.append(d)
+    return runs
+
+
+def get_slurm_info(run_dir):
+    """Read SLURM job ID from run_dir/slurm_job_id and query sacct."""
     import subprocess
     info = {}
-    run_dir = os.path.dirname(stdout_path)
-    sim_dir = os.path.dirname(run_dir)
-    # Find the most recent job output file
     try:
-        job_files = sorted(
-            [f for f in os.listdir(sim_dir) if f.startswith("spectre_glorysv12_run-") and f.endswith(".out")],
-            key=lambda f: os.path.getmtime(os.path.join(sim_dir, f)),
-            reverse=True,
+        job_id_file = os.path.join(run_dir, "slurm_job_id")
+        if not os.path.exists(job_id_file):
+            return None
+        with open(job_id_file, "r") as f:
+            job_id = f.read().strip()
+        if not job_id:
+            return None
+        info["job_id"] = job_id
+        result = subprocess.run(
+            ["sacct", "-j", job_id, "--format=JobID,NodeList,State,Elapsed,Start", "--noheader", "-P"],
+            capture_output=True, text=True, timeout=5,
         )
-        if job_files:
-            job_id = job_files[0].split("-")[1].split(".")[0]
-            info["job_id"] = job_id
-            result = subprocess.run(
-                ["sacct", "-j", job_id, "--format=JobID,NodeList,State,Elapsed,Start", "--noheader", "-P"],
-                capture_output=True, text=True, timeout=5,
-            )
-            for line in result.stdout.strip().split("\n"):
-                parts = line.split("|")
-                if len(parts) >= 5 and "." not in parts[0]:
-                    info["node"] = parts[1]
-                    info["state"] = parts[2]
-                    info["elapsed"] = parts[3]
-                    info["start"] = parts[4]
-                    break
+        for line in result.stdout.strip().split("\n"):
+            parts = line.split("|")
+            if len(parts) >= 5 and "." not in parts[0]:
+                info["node"] = parts[1]
+                info["state"] = parts[2]
+                info["elapsed"] = parts[3]
+                info["start"] = parts[4]
+                break
     except Exception:
         pass
     return info if info else None
 
 
+# ---------------------------------------------------------------------------
+# JSON builders
+# ---------------------------------------------------------------------------
+
 def records_to_json(records, start_date, slurm_info=None, wall_start=None):
     t0 = datetime.strptime(start_date, "%Y-%m-%d")
-    times = []
-    for r in records:
-        s = r.get("time_secondsf", 0)
-        times.append((t0 + timedelta(seconds=s)).isoformat())
+    times = [(t0 + timedelta(seconds=r.get("time_secondsf", 0))).isoformat() for r in records]
 
     all_keys = set()
     for r in records:
         all_keys.update(r.keys())
 
-    # Human-readable labels for raw CFL variables
-    RAW_LABELS = {
-        "advcfl_uvel_max": "U", "advcfl_vvel_max": "V",
-        "advcfl_wvel_max": "W", "advcfl_W_hf_max": "W half",
-        "trAdv_CFL_u_max": "U", "trAdv_CFL_v_max": "V",
-        "trAdv_CFL_w_max": "W",
-    }
-
     panels_data = []
     for panel in PANELS:
         traces = []
         is_raw = panel.get("raw", False)
-
         if is_raw:
             for var in panel["vars"]:
                 if var not in all_keys:
@@ -162,10 +169,8 @@ def records_to_json(records, start_date, slurm_info=None, wall_start=None):
                 if all(v is None for v in values):
                     continue
                 label = RAW_LABELS.get(var, var)
-                traces.append({
-                    "name": label, "x": times, "y": values,
-                    "mode": "lines", "visible": True,
-                })
+                traces.append({"name": label, "x": times, "y": values,
+                               "mode": "lines", "visible": True})
         else:
             for base_var in panel["vars"]:
                 for suffix in STAT_SUFFIXES:
@@ -181,38 +186,32 @@ def records_to_json(records, start_date, slurm_info=None, wall_start=None):
                         label = f"{short} {label}"
                     dash = "solid" if "mean" in suffix else ("dash" if suffix in ("_max", "_min") else "dot")
                     visible = True if suffix in ("_max", "_mean", "_min") else "legendonly"
-                    traces.append({
-                        "name": label, "x": times, "y": values,
-                        "mode": "lines", "line": {"dash": dash}, "visible": visible,
-                    })
+                    traces.append({"name": label, "x": times, "y": values,
+                                   "mode": "lines", "line": {"dash": dash}, "visible": visible})
                 if base_var in all_keys:
                     values = [r.get(base_var) for r in records]
                     if not all(v is None for v in values):
                         traces.append({"name": base_var, "x": times, "y": values, "mode": "lines"})
-
         if traces:
             panels_data.append({
                 "title": f"{panel['title']} ({panel['unit']})" if panel["unit"] else panel["title"],
-                "unit": panel["unit"],
-                "traces": traces,
+                "unit": panel["unit"], "traces": traces,
             })
 
     last = records[-1] if records else {}
     model_days = last.get("time_secondsf", 0) / 86400.0
-
-    # Throughput: sim days per wall hour
     throughput = None
     if wall_start and model_days > 0:
         wall_hours = (datetime.now() - wall_start).total_seconds() / 3600.0
         if wall_hours > 0:
-            throughput = model_days / wall_hours
+            throughput = round(model_days / wall_hours, 2)
 
     result = {
         "n_steps": last.get("time_tsnumber", 0),
         "model_days": model_days,
         "n_records": len(records),
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "throughput": round(throughput, 2) if throughput else None,
+        "throughput": throughput,
         "panels": panels_data,
     }
     if slurm_info:
@@ -220,8 +219,20 @@ def records_to_json(records, start_date, slurm_info=None, wall_start=None):
     return json.dumps(result)
 
 
+def scan_plots(plots_dir):
+    plots = {}
+    for png in sorted(glob.glob(os.path.join(plots_dir, "*.png"))):
+        basename = os.path.basename(png)
+        parts = basename.replace(".png", "").split("_", 1)
+        if len(parts) != 2:
+            continue
+        field, ts = parts
+        plots.setdefault(field, []).append({"ts": ts, "file": basename})
+    return plots
+
+
 # ---------------------------------------------------------------------------
-# HTML (served once; JS polls /data for updates)
+# HTML
 # ---------------------------------------------------------------------------
 
 DASHBOARD_HTML = """<!DOCTYPE html>
@@ -241,22 +252,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .header { display: flex; align-items: center; justify-content: space-between;
             margin-bottom: 12px; }
-  .summary { display: flex; gap: 24px; font-size: 13px; }
+  .summary { display: flex; gap: 20px; font-size: 13px; flex-wrap: wrap; }
   .summary .item { display: flex; flex-direction: column; }
   .summary .label { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
   .summary .value { font-size: 16px; font-weight: 600; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  .chart-box { background: #fff; border-radius: 6px; padding: 10px;
-               box-shadow: 0 1px 3px rgba(0,0,0,0.08); height: 270px; position: relative; }
+  .chart-box { background: #fff; border-radius: 6px; padding: 8px;
+               box-shadow: 0 1px 3px rgba(0,0,0,0.08); height: 270px; }
   .chart-box canvas { width: 100% !important; height: 100% !important; }
   .footer { text-align: center; color: #aaa; font-size: 11px; margin-top: 14px; }
   #status { font-size: 11px; color: #888; }
+  select { padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; }
 </style>
 </head>
 <body>
 <div class="header">
-  <div><h1>MITgcm Live Monitor</h1><span class="live"></span></div>
+  <div>
+    <h1>MITgcm Live Monitor</h1><span class="live"></span>
+    <select id="run-select" style="margin-left:12px;" onchange="switchRun()"></select>
+  </div>
   <div id="status">connecting...</div>
 </div>
 <div class="summary">
@@ -275,7 +290,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
     <h2 style="margin:0; font-size:16px;">Surface Fields</h2>
     <div style="display:flex; gap:10px; align-items:center;">
-      <select id="field-select" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:13px;">
+      <select id="field-select">
         <option value="SST">Sea Surface Temperature</option>
         <option value="SSS">Sea Surface Salinity</option>
         <option value="SSH">Sea Surface Height</option>
@@ -298,18 +313,49 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
-<div class="footer">Polling STDOUT.0000 every <span id="poll_s">POLL_INTERVAL</span>s</div>
+<div class="footer">Polling every <span id="poll_s">POLL_INTERVAL</span>s</div>
 <script>
 const POLL = POLL_INTERVAL * 1000;
 const COLORS = ['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2'];
 let charts = [];
+let plotsData = {};
+let currentField = 'SST';
+let currentRun = '';
 
+// --- Run selector ---
+async function loadRuns() {
+  try {
+    const r = await fetch('/runs');
+    const runs = await r.json();
+    const sel = document.getElementById('run-select');
+    const prev = currentRun;
+    sel.innerHTML = '';
+    runs.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      if (name === prev) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!currentRun && runs.length > 0) {
+      currentRun = runs[runs.length - 1]; // default to latest
+      sel.value = currentRun;
+    }
+  } catch(e) {}
+}
+function switchRun() {
+  currentRun = document.getElementById('run-select').value;
+  charts = []; // force chart rebuild
+  document.getElementById('grid').innerHTML = '';
+  poll();
+  pollPlots();
+}
+
+// --- Charts ---
 function makeDash(suffix) {
   if (suffix.includes('mean')) return [];
   if (suffix.includes('max') || suffix.includes('min')) return [6, 3];
   return [2, 2];
 }
-
 function createCharts(panels) {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
@@ -320,25 +366,19 @@ function createCharts(panels) {
     const canvas = document.createElement('canvas');
     box.appendChild(canvas);
     grid.appendChild(box);
-
     const datasets = p.traces.map((tr, ti) => ({
       label: tr.name,
       data: tr.x.map((t, i) => ({ x: t, y: tr.y[i] })),
       borderColor: COLORS[ti % COLORS.length],
       borderWidth: tr.name.includes('Mean') || tr.name.includes('mean') ? 2 : 1.2,
       borderDash: makeDash(tr.name),
-      pointRadius: 0,
-      tension: 0.2,
+      pointRadius: 0, tension: 0.2,
       hidden: tr.visible === 'legendonly',
     }));
-
     charts.push(new Chart(canvas, {
-      type: 'line',
-      data: { datasets },
+      type: 'line', data: { datasets },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
+        responsive: true, maintainAspectRatio: false, animation: false,
         plugins: {
           title: { display: true, text: p.title, font: { size: 13 } },
           legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 10 } } },
@@ -352,78 +392,38 @@ function createCharts(panels) {
     }));
   });
 }
-
 function updateCharts(panels) {
   panels.forEach((p, pi) => {
     if (pi >= charts.length) return;
     const chart = charts[pi];
     p.traces.forEach((tr, ti) => {
-      if (ti < chart.data.datasets.length) {
+      if (ti < chart.data.datasets.length)
         chart.data.datasets[ti].data = tr.x.map((t, i) => ({ x: t, y: tr.y[i] }));
-      }
     });
     chart.update('none');
   });
 }
 
-async function poll() {
-  try {
-    const r = await fetch('/data?_t=' + Date.now());
-    const d = await r.json();
-    document.getElementById('s_steps').textContent = d.n_steps.toLocaleString();
-    document.getElementById('s_days').textContent = d.model_days.toFixed(1);
-    document.getElementById('s_throughput').textContent = d.throughput ? d.throughput.toFixed(1) : '\u2014';
-    document.getElementById('s_time').textContent = d.generated.split(' ')[1];
-    document.getElementById('status').textContent = 'last poll: ' + d.generated;
-    if (d.slurm) {
-      document.getElementById('s_job').textContent = d.slurm.job_id || '\u2014';
-      document.getElementById('s_state').textContent = d.slurm.state || '\u2014';
-      document.getElementById('s_node').textContent = d.slurm.node || '\u2014';
-      document.getElementById('s_elapsed').textContent = d.slurm.elapsed || '\u2014';
-    }
-    if (charts.length !== d.panels.length) {
-      createCharts(d.panels);
-    } else {
-      updateCharts(d.panels);
-    }
-  } catch (e) {
-    document.getElementById('status').textContent = 'error: ' + e.message;
-  }
-}
-
 // --- Surface field viewer ---
-let plotsData = {};
-let currentField = 'SST';
-
 document.getElementById('field-select').addEventListener('change', (e) => {
-  currentField = e.target.value;
-  renderFieldViewer();
+  currentField = e.target.value; renderFieldViewer();
 });
-
 document.getElementById('time-slider').addEventListener('input', (e) => {
   renderFieldImage(parseInt(e.target.value));
 });
-
 function renderFieldViewer() {
   const entries = plotsData[currentField] || [];
   const msg = document.getElementById('field-msg');
   const img = document.getElementById('field-img');
   const wrap = document.getElementById('slider-wrap');
   const slider = document.getElementById('time-slider');
-
   if (entries.length === 0) {
-    msg.style.display = 'block';
-    msg.textContent = 'No plots available yet for ' + currentField;
-    img.style.display = 'none';
-    wrap.style.display = 'none';
-    return;
+    msg.style.display = 'block'; msg.textContent = 'No plots available yet for ' + currentField;
+    img.style.display = 'none'; wrap.style.display = 'none'; return;
   }
-
-  msg.style.display = 'none';
-  img.style.display = 'block';
+  msg.style.display = 'none'; img.style.display = 'block';
   const recent = entries.slice(-5);
-  slider.max = recent.length - 1;
-  slider.value = recent.length - 1;
+  slider.max = recent.length - 1; slider.value = recent.length - 1;
   wrap.style.display = recent.length > 1 ? 'block' : 'none';
   if (recent.length > 1) {
     document.getElementById('slider-oldest').textContent = recent[0].ts;
@@ -431,29 +431,49 @@ function renderFieldViewer() {
   }
   renderFieldImage(recent.length - 1);
 }
-
 function renderFieldImage(idx) {
   const entries = (plotsData[currentField] || []).slice(-5);
   if (idx >= entries.length) return;
   const e = entries[idx];
-  const img = document.getElementById('field-img');
-  img.src = '/img/' + e.file + '?_t=' + Date.now();
+  document.getElementById('field-img').src = '/img/' + currentRun + '/' + e.file;
   document.getElementById('slider-label').textContent = 'Step ' + e.ts;
 }
 
+// --- Polling ---
+async function poll() {
+  try {
+    const r = await fetch('/data?run=' + encodeURIComponent(currentRun));
+    const d = await r.json();
+    document.getElementById('s_steps').textContent = d.n_steps.toLocaleString();
+    document.getElementById('s_days').textContent = d.model_days.toFixed(1);
+    document.getElementById('s_throughput').textContent = d.throughput ? d.throughput.toFixed(1) : '\\u2014';
+    document.getElementById('s_time').textContent = d.generated.split(' ')[1];
+    document.getElementById('status').textContent = 'last poll: ' + d.generated;
+    if (d.slurm) {
+      document.getElementById('s_job').textContent = d.slurm.job_id || '\\u2014';
+      document.getElementById('s_state').textContent = d.slurm.state || '\\u2014';
+      document.getElementById('s_node').textContent = d.slurm.node || '\\u2014';
+      document.getElementById('s_elapsed').textContent = d.slurm.elapsed || '\\u2014';
+    }
+    if (charts.length !== d.panels.length) { createCharts(d.panels); }
+    else { updateCharts(d.panels); }
+  } catch (e) {
+    document.getElementById('status').textContent = 'error: ' + e.message;
+  }
+}
 async function pollPlots() {
   try {
-    const r = await fetch('/plots?_t=' + Date.now());
+    const r = await fetch('/plots?run=' + encodeURIComponent(currentRun));
     plotsData = await r.json();
     renderFieldViewer();
   } catch(e) {}
 }
 
 document.getElementById('poll_s').textContent = POLL_INTERVAL;
-poll();
-pollPlots();
+loadRuns().then(() => { poll(); pollPlots(); });
 setInterval(poll, POLL);
 setInterval(pollPlots, POLL * 2);
+setInterval(loadRuns, POLL * 10); // refresh run list occasionally
 </script>
 </body>
 </html>"""
@@ -463,150 +483,151 @@ setInterval(pollPlots, POLL * 2);
 # HTTP server
 # ---------------------------------------------------------------------------
 
-def scan_plots(plots_dir):
-    """Scan plots directory and return structured metadata."""
-    import glob as _glob
-    plots = {}  # {field: [{ts, date, filename}, ...]}
-    for png in sorted(_glob.glob(os.path.join(plots_dir, "*.png"))):
-        basename = os.path.basename(png)
-        # e.g. SST_0000000240.png
-        parts = basename.replace(".png", "").split("_", 1)
-        if len(parts) != 2:
-            continue
-        field, ts = parts
-        plots.setdefault(field, []).append({"ts": ts, "file": basename})
-    return plots
-
-
 class DashboardHandler(BaseHTTPRequestHandler):
-    watcher = None
+    simulation_dir = None
+    watchers = {}       # run_name → StdoutWatcher
     start_date = "2002-07-01"
     poll_interval = 30
-    slurm_info = None
-    wall_start = None
-    plots_dir = None
+
+    def _get_run(self):
+        """Extract run= query param, default to latest."""
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        run = params.get("run", [None])[0]
+        if not run:
+            runs = discover_runs(self.simulation_dir)
+            run = runs[-1] if runs else None
+        return run
+
+    def _get_watcher(self, run_name):
+        """Get or create a watcher for the given run."""
+        if run_name not in self.watchers:
+            stdout_path = os.path.join(self.simulation_dir, run_name, "STDOUT.0000")
+            if os.path.exists(stdout_path):
+                w = StdoutWatcher(stdout_path)
+                w.poll()
+                self.watchers[run_name] = w
+        return self.watchers.get(run_name)
+
+    def _respond(self, code, content_type, body):
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        if "json" in content_type:
+            self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(body if isinstance(body, bytes) else body.encode())
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
-            html = DASHBOARD_HTML.replace("POLL_INTERVAL", str(self.poll_interval))
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode())
-        elif self.path.startswith("/data"):
-            try:
-                w = self.watcher
-                w.poll()
-                if w._json_cache is None:
-                    self.__class__.slurm_info = get_slurm_info(w.path)
-                    w._json_cache = records_to_json(
-                        w.records, self.start_date,
-                        slurm_info=self.slurm_info,
-                        wall_start=self.wall_start,
-                    )
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
-                self.wfile.write(w._json_cache.encode())
-            except Exception as e:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
-        elif self.path.startswith("/plots"):
-            # Return JSON listing of available plots
-            plots = scan_plots(self.plots_dir) if self.plots_dir else {}
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-cache")
-            self.end_headers()
-            self.wfile.write(json.dumps(plots).encode())
-        elif self.path.split("?")[0].startswith("/img/"):
-            # Serve plot images
-            fname = self.path.split("?")[0][5:]  # strip /img/ and query string
-            if ".." in fname or "/" in fname:
-                self.send_response(403)
-                self.end_headers()
-                return
-            fpath = os.path.join(self.plots_dir, fname) if self.plots_dir else None
-            if fpath and os.path.exists(fpath):
-                self.send_response(200)
-                self.send_header("Content-Type", "image/png")
-                self.send_header("Cache-Control", "public, max-age=86400")
-                self.end_headers()
-                with open(fpath, "rb") as f:
-                    self.wfile.write(f.read())
-            else:
-                self.send_response(404)
-                self.end_headers()
-        elif self.path.startswith("/archive"):
-            # Simple archive listing page
-            plots = scan_plots(self.plots_dir) if self.plots_dir else {}
-            html = self._render_archive(plots)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+        path = self.path.split("?")[0]
 
-    def _render_archive(self, plots):
-        rows = ""
-        for field in sorted(plots.keys()):
-            for p in plots[field]:
-                rows += f'<tr><td>{field}</td><td>{p["ts"]}</td><td><a href="/img/{p["file"]}"><img src="/img/{p["file"]}" style="max-width:300px"></a></td></tr>\n'
-        return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plot Archive</title>
+        if path == "/" or path == "/index.html":
+            html = DASHBOARD_HTML.replace("POLL_INTERVAL", str(self.poll_interval))
+            self._respond(200, "text/html; charset=utf-8", html.encode())
+
+        elif path == "/runs":
+            runs = discover_runs(self.simulation_dir)
+            self._respond(200, "application/json", json.dumps(runs).encode())
+
+        elif path.startswith("/data"):
+            run = self._get_run()
+            if not run:
+                self._respond(200, "application/json", json.dumps({"n_steps": 0, "model_days": 0, "n_records": 0, "generated": "", "panels": []}).encode())
+                return
+            w = self._get_watcher(run)
+            if not w:
+                self._respond(200, "application/json", json.dumps({"n_steps": 0, "model_days": 0, "n_records": 0, "generated": "", "panels": []}).encode())
+                return
+            w.poll()
+            if w._json_cache is None:
+                run_path = os.path.join(self.simulation_dir, run)
+                slurm_info = get_slurm_info(run_path)
+                wall_start = None
+                if slurm_info and slurm_info.get("start"):
+                    try:
+                        wall_start = datetime.strptime(slurm_info["start"], "%Y-%m-%dT%H:%M:%S")
+                    except ValueError:
+                        pass
+                w._json_cache = records_to_json(w.records, self.start_date,
+                                                 slurm_info=slurm_info, wall_start=wall_start)
+            self._respond(200, "application/json", w._json_cache.encode())
+
+        elif path.startswith("/plots"):
+            run = self._get_run()
+            if run:
+                plots_dir = os.path.join(self.simulation_dir, run, "plots")
+                plots = scan_plots(plots_dir) if os.path.isdir(plots_dir) else {}
+            else:
+                plots = {}
+            self._respond(200, "application/json", json.dumps(plots).encode())
+
+        elif path.startswith("/img/"):
+            # /img/<run_name>/<filename>
+            parts = path[5:].split("/", 1)
+            if len(parts) == 2:
+                run_name, fname = parts
+                if ".." not in fname:
+                    fpath = os.path.join(self.simulation_dir, run_name, "plots", fname)
+                    if os.path.exists(fpath):
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/png")
+                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.end_headers()
+                        with open(fpath, "rb") as f:
+                            self.wfile.write(f.read())
+                        return
+            self._respond(404, "text/plain", b"Not found")
+
+        elif path.startswith("/archive"):
+            run = self._get_run()
+            plots_dir = os.path.join(self.simulation_dir, run, "plots") if run else ""
+            plots = scan_plots(plots_dir) if os.path.isdir(plots_dir) else {}
+            rows = ""
+            for field in sorted(plots.keys()):
+                for p in plots[field]:
+                    img_url = f"/img/{run}/{p['file']}"
+                    rows += f'<tr><td>{field}</td><td>{p["ts"]}</td><td><a href="{img_url}"><img src="{img_url}" style="max-width:300px"></a></td></tr>\n'
+            html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plot Archive — {run}</title>
 <style>body{{font-family:sans-serif;margin:20px}}table{{border-collapse:collapse}}td,th{{border:1px solid #ddd;padding:8px}}
 th{{background:#f5f5f5}}a{{color:#2563eb}}img{{border-radius:4px}}</style></head>
-<body><h1>Plot Archive</h1><p><a href="/">&larr; Dashboard</a></p>
+<body><h1>Plot Archive — {run}</h1><p><a href="/">&larr; Dashboard</a></p>
 <table><tr><th>Field</th><th>Timestep</th><th>Image</th></tr>{rows}</table></body></html>"""
+            self._respond(200, "text/html; charset=utf-8", html.encode())
+
+        else:
+            self._respond(404, "text/plain", b"Not found")
 
     def log_message(self, format, *args):
-        pass  # suppress access logs
+        pass
 
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="MITgcm live monitor dashboard")
-    parser.add_argument("stdout_file", help="Path to STDOUT.0000")
-    parser.add_argument("--port", "-p", type=int, default=8050, help="HTTP port (default 8050)")
-    parser.add_argument("--poll", type=int, default=30, help="Browser poll interval in seconds (default 30)")
-    parser.add_argument("--start-date", default="2002-07-01", help="Simulation start date (YYYY-MM-DD)")
-    parser.add_argument("--plots-dir", default=None, help="Directory containing surface field PNGs")
+    parser.add_argument("simulation_dir", help="Path to simulation directory (e.g. simulations/glorysv12-curvilinear/)")
+    parser.add_argument("--port", "-p", type=int, default=8050)
+    parser.add_argument("--poll", type=int, default=30)
+    parser.add_argument("--start-date", default="2002-07-01")
     args = parser.parse_args()
 
-    if not os.path.exists(args.stdout_file):
-        print(f"Error: {args.stdout_file} not found", file=sys.stderr)
+    simulation_dir = os.path.abspath(args.simulation_dir)
+    if not os.path.isdir(simulation_dir):
+        print(f"Error: {simulation_dir} is not a directory", file=sys.stderr)
         sys.exit(1)
 
-    watcher = StdoutWatcher(os.path.abspath(args.stdout_file))
-    watcher.poll()  # initial parse
-    print(f"Initial parse: {len(watcher.records)} monitor blocks")
+    runs = discover_runs(simulation_dir)
+    print(f"Simulation directory: {simulation_dir}")
+    print(f"Discovered runs: {runs}")
 
-    DashboardHandler.watcher = watcher
+    DashboardHandler.simulation_dir = simulation_dir
     DashboardHandler.start_date = args.start_date
     DashboardHandler.poll_interval = args.poll
-    # Plots directory — default to run_dir/plots
-    run_dir = os.path.dirname(os.path.abspath(args.stdout_file))
-    plots_dir = args.plots_dir or os.path.join(run_dir, "plots")
-    os.makedirs(plots_dir, exist_ok=True)
-    DashboardHandler.plots_dir = plots_dir
-    print(f"Plots directory: {plots_dir}")
-    slurm_info = get_slurm_info(os.path.abspath(args.stdout_file))
-    DashboardHandler.slurm_info = slurm_info
-    # Use SLURM job start time for throughput calculation
-    wall_start = None
-    if slurm_info and slurm_info.get("start"):
-        try:
-            wall_start = datetime.strptime(slurm_info["start"], "%Y-%m-%dT%H:%M:%S")
-        except ValueError:
-            pass
-    DashboardHandler.wall_start = wall_start or datetime.now()
 
     hostname = os.uname().nodename
     server = HTTPServer(("127.0.0.1", args.port), DashboardHandler)
     print(f"Dashboard live at http://{hostname}:{args.port}")
-    print(f"Watching: {args.stdout_file}")
     print(f"Poll interval: {args.poll}s")
     try:
         server.serve_forever()

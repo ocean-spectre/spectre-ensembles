@@ -7,15 +7,16 @@
 #SBATCH --output=%x-%A.out
 #SBATCH --error=%x-%A.out
 
-export RUN_DIR="test-run-03252026/"
+export RUN_DIR="${RUN_DIR:-test-run-03252026/}"
 
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
     SCRIPT_DIR=$(dirname "$(readlink -f "$SCRIPT_PATH")")
-    SIMULATION_DIR=$(dirname $SCRIPT_DIR)
+    SIMULATION_DIR="${SIMULATION_DIR:-$(dirname $SCRIPT_DIR)}"
 else
     # Fallback for when running the script outside of a Slurm job
     SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+    SIMULATION_DIR="${SIMULATION_DIR:-$(dirname $SCRIPT_DIR)}"
 fi
 
 source $SCRIPT_DIR/env.sh
@@ -25,8 +26,24 @@ echo ""
 echo " Using simulation directory : ${SIMULATION_DIR}"
 echo " Using run directory        : ${RUN_DIR}"
 echo " Using MITgcm base image    : ${MITGCM_BASE_IMG}"
+echo " SLURM Job ID               : ${SLURM_JOB_ID}"
 echo ""
 echo "======================================="
+
+# Write job ID into the run directory so the dashboard can find it
+mkdir -p ${RUN_DIR}
+echo ${SLURM_JOB_ID} > ${RUN_DIR}/slurm_job_id
+
+###############################################################################
+# Sync namelist files (data*) from beegfs to local input directory
+# This ensures the local disk copy always has the latest configuration
+###############################################################################
+echo "-------------------------------------"
+echo "  > Syncing namelist files to local input directory..."
+cp -v ${SIMULATION_DIR}/input/data* ${SIMULATION_INPUT_DIR}/ 2>/dev/null
+cp -v ${SIMULATION_DIR}/input/eedata ${SIMULATION_INPUT_DIR}/ 2>/dev/null
+echo "  > Done syncing."
+echo "-------------------------------------"
 
 ###############################################################################
 # Set up run directory
