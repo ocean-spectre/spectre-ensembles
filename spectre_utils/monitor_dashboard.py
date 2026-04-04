@@ -27,21 +27,38 @@ from urllib.parse import urlparse, parse_qs
 # ---------------------------------------------------------------------------
 
 PANELS = [
+    # Dynamics
     {"title": "Sea Surface Height",  "vars": ["dynstat_eta"],    "unit": "m"},
     {"title": "Temperature",         "vars": ["dynstat_theta"],  "unit": "°C"},
     {"title": "Salinity",            "vars": ["dynstat_salt"],   "unit": "PSU"},
     {"title": "Zonal Velocity (U)",  "vars": ["dynstat_uvel"],   "unit": "m/s"},
     {"title": "Meridional Velocity (V)", "vars": ["dynstat_vvel"], "unit": "m/s"},
     {"title": "Vertical Velocity (W)", "vars": ["dynstat_wvel"], "unit": "m/s"},
+    # Energy & vorticity
+    {"title": "Kinetic Energy",      "vars": ["ke_max", "ke_mean"], "unit": "m²/s²", "raw": True},
+    {"title": "Potential Energy",    "vars": ["pe_b_mean"], "unit": "m²/s²", "raw": True},
+    {"title": "Vorticity (relative)","vars": ["vort_r_max", "vort_r_min"], "unit": "1/s", "raw": True},
+    {"title": "Vorticity (absolute)","vars": ["vort_a_mean", "vort_a_sd"], "unit": "1/s", "raw": True},
+    # Surface expansion
+    {"title": "Surface Expansion",   "vars": ["surfExpan_theta_mean", "surfExpan_salt_mean"], "unit": "", "raw": True},
+    # EXF forcing
     {"title": "Wind Speed",          "vars": ["exf_wspeed"],     "unit": "m/s"},
     {"title": "Wind Stress (U)",     "vars": ["exf_ustress"],    "unit": "N/m²"},
     {"title": "Wind Stress (V)",     "vars": ["exf_vstress"],    "unit": "N/m²"},
     {"title": "Net Heat Flux",       "vars": ["exf_hflux"],      "unit": "W/m²"},
+    {"title": "Salt Flux",           "vars": ["exf_sflux"],      "unit": "g/m²/s"},
+    {"title": "SW Flux (net)",       "vars": ["exf_swflux"],     "unit": "W/m²"},
+    {"title": "LW Flux (net)",       "vars": ["exf_lwflux"],     "unit": "W/m²"},
     {"title": "Air Temperature (2m)","vars": ["exf_atemp"],      "unit": "K"},
     {"title": "Specific Humidity",   "vars": ["exf_aqh"],        "unit": "kg/kg"},
     {"title": "Shortwave Down",      "vars": ["exf_swdown"],     "unit": "W/m²"},
     {"title": "Longwave Down",       "vars": ["exf_lwdown"],     "unit": "W/m²"},
     {"title": "Freshwater Flux",     "vars": ["exf_evap", "exf_precip"], "unit": "m/s"},
+    # OBC
+    {"title": "OBC North Transport", "vars": ["obc_N_vVel_Int"], "unit": "m³/s", "raw": True},
+    {"title": "OBC South Transport", "vars": ["obc_S_vVel_Int"], "unit": "m³/s", "raw": True},
+    {"title": "OBC East Transport",  "vars": ["obc_E_uVel_Int"], "unit": "m³/s", "raw": True},
+    # CFL
     {"title": "Advective CFL",      "vars": ["advcfl_uvel_max", "advcfl_vvel_max", "advcfl_wvel_max", "advcfl_W_hf_max"], "unit": "", "raw": True},
     {"title": "Tracer CFL",         "vars": ["trAdv_CFL_u_max", "trAdv_CFL_v_max", "trAdv_CFL_w_max"], "unit": "", "raw": True},
 ]
@@ -106,12 +123,23 @@ class StdoutWatcher:
 # ---------------------------------------------------------------------------
 
 def discover_runs(simulation_dir):
-    """Find subdirectories containing STDOUT.0000."""
+    """Find subdirectories containing STDOUT.0000 (up to two levels deep)."""
     runs = []
     for d in sorted(os.listdir(simulation_dir)):
         full = os.path.join(simulation_dir, d)
-        if os.path.isdir(full) and os.path.exists(os.path.join(full, "STDOUT.0000")):
+        if not os.path.isdir(full):
+            continue
+        if os.path.exists(os.path.join(full, "STDOUT.0000")):
             runs.append(d)
+        else:
+            # Check one level deeper (e.g. repeat-year-50/001/)
+            try:
+                for sub in sorted(os.listdir(full)):
+                    subfull = os.path.join(full, sub)
+                    if os.path.isdir(subfull) and os.path.exists(os.path.join(subfull, "STDOUT.0000")):
+                        runs.append(os.path.join(d, sub))
+            except OSError:
+                pass
     return runs
 
 
@@ -272,7 +300,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <h1>MITgcm Live Monitor</h1><span class="live"></span>
     <select id="run-select" style="margin-left:12px;" onchange="switchRun()"></select>
   </div>
-  <div id="status">connecting...</div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <a id="csv-link" href="/csv" style="font-size:11px; color:#2563eb; text-decoration:none;">Download CSV</a>
+    <span id="status">connecting...</span>
+  </div>
 </div>
 <div class="summary">
   <div class="item"><span class="label">Job</span><span class="value" id="s_job">&mdash;</span></div>
@@ -346,6 +377,7 @@ function switchRun() {
   currentRun = document.getElementById('run-select').value;
   charts = []; // force chart rebuild
   document.getElementById('grid').innerHTML = '';
+  document.getElementById('csv-link').href = '/csv?run=' + encodeURIComponent(currentRun);
   poll();
   pollPlots();
 }
@@ -560,6 +592,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 plots = {}
             self._respond(200, "application/json", json.dumps(plots).encode())
 
+        elif path.startswith("/csv"):
+            run = self._get_run()
+            w = self._get_watcher(run) if run else None
+            if w:
+                w.poll()
+                csv = self._build_csv(w.records, run)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv")
+                self.send_header("Content-Disposition", f'attachment; filename="monitor_{run}.csv"')
+                self.end_headers()
+                self.wfile.write(csv.encode())
+            else:
+                self._respond(404, "text/plain", b"No data")
+
         elif path.startswith("/img/"):
             # /img/<run_name>/<filename>
             parts = path[5:].split("/", 1)
@@ -595,6 +641,24 @@ th{{background:#f5f5f5}}a{{color:#2563eb}}img{{border-radius:4px}}</style></head
 
         else:
             self._respond(404, "text/plain", b"Not found")
+
+    def _build_csv(self, records, run_name):
+        """Build CSV string from monitor records."""
+        if not records:
+            return ""
+        # Collect all keys across all records
+        all_keys = set()
+        for r in records:
+            all_keys.update(r.keys())
+        # Add model_date column
+        t0 = datetime.strptime(self.start_date, "%Y-%m-%d")
+        cols = ["model_date"] + sorted(all_keys)
+        lines = [",".join(cols)]
+        for r in records:
+            date = (t0 + timedelta(seconds=r.get("time_secondsf", 0))).strftime("%Y-%m-%d %H:%M")
+            vals = [date] + [str(r.get(k, "")) for k in sorted(all_keys)]
+            lines.append(",".join(vals))
+        return "\n".join(lines)
 
     def log_message(self, format, *args):
         pass
