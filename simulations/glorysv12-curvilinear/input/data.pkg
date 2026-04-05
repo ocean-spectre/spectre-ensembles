@@ -7,4 +7,5 @@
  useDIAGNOSTICS=.TRUE.,
  useCAL=.TRUE.,
  useEXF=.TRUE,
+ useFRAZIL=.TRUE.,
  &end

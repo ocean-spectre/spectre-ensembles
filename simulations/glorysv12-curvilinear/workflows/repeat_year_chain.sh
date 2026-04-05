@@ -49,7 +49,7 @@ for i in $(seq 1 $N_RUNS); do
         -n64
         -c1
         --time=3-00:00:00
-        --nodelist=noether
+        --nodelist=franklin
         --job-name="repeat_yr_${RUN_NUM}"
         --output="${EXPERIMENT_DIR}/${RUN_NUM}-%A.out"
         --error="${EXPERIMENT_DIR}/${RUN_NUM}-%A.out"

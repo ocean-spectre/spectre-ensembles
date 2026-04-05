@@ -607,10 +607,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._respond(404, "text/plain", b"No data")
 
         elif path.startswith("/img/"):
-            # /img/<run_name>/<filename>
-            parts = path[5:].split("/", 1)
-            if len(parts) == 2:
-                run_name, fname = parts
+            # /img/<run_name>/<filename> — run_name may contain slashes (e.g. repeat-year-50/001)
+            remainder = path[5:]
+            last_slash = remainder.rfind("/")
+            if last_slash > 0:
+                run_name = remainder[:last_slash]
+                fname = remainder[last_slash + 1:]
                 if ".." not in fname:
                     fpath = os.path.join(self.simulation_dir, run_name, "plots", fname)
                     if os.path.exists(fpath):

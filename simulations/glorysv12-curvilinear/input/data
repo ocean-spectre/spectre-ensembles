@@ -4,9 +4,9 @@
 #
 # Continuous equation parameters
  &PARM01
- viscAh=1.0,
- diffKhT=1.0,
- diffKhS=1.0,
+ viscAh=2.0,
+ diffKhT=2.0,
+ diffKhS=2.0,
  viscAz=1.E-5,
  viscA4=7.9E7,
  bottomDragLinear=0.0,
@@ -20,6 +20,7 @@
  implicitViscosity=.TRUE.,
  implicitDiffusion=.TRUE.,
  eosType='TEOS10',
+ allowFreezing=.TRUE.,
  rigidLid=.FALSE.,
  implicitFreeSurface=.TRUE.,
  hFacMin=1.0,

@@ -14,7 +14,12 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+    SCRIPT_PATH=$(scontrol show job "$SLURM_JOB_ID" --json | jq -r '.jobs[0].command' )
+    SCRIPT_DIR=$(dirname "$(readlink -f "$SCRIPT_PATH")")
+else
+    SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+fi
 source "$SCRIPT_DIR/env.sh"
 
 REPO_ROOT=$(readlink -f "$SIMULATION_DIR/../..")
@@ -31,6 +36,10 @@ echo " MITgcm image           : ${MITGCM_BASE_IMG}"
 echo " SLURM Job ID           : ${SLURM_JOB_ID:-none}"
 echo ""
 echo "======================================="
+
+# Write SLURM job ID for dashboard discovery
+mkdir -p "${SIMULATION_DIR}/${RUN_DIR}"
+echo "${SLURM_JOB_ID:-}" > "${SIMULATION_DIR}/${RUN_DIR}/slurm_job_id"
 
 ###############################################################################
 # Step 1: Set up run directory — symlink all input files

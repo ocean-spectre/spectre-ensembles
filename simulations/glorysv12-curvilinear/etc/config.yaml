@@ -1,6 +1,10 @@
 name: spectre-glorysv12
 description: |
   Glorys v12 on 1/12 degree resolution for the years 2003-2015, but run with the MITgcm.
+  Frazil ice formation is enabled (useFRAZIL=.TRUE. in data.pkg) with allowFreezing=.TRUE.
+  in data PARM01. This allows seawater to freeze when temperature drops below the local
+  freezing point, converting excess cooling into frazil ice and preventing unphysical
+  sub-freezing temperatures.
 
 # References path inside the container
 working_directory: /data
