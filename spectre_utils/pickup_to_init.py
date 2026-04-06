@@ -118,7 +118,11 @@ def pickup_to_init(pickup_prefix: str, output_dir: str, nx: int, ny: int, nr: in
             data = data.reshape((nlevels, ny, nx))
 
             # Convert to float32 for init files
+            # Remove existing symlink if present (setup step creates symlinks
+            # to input/ which may be dangling in this container context)
             init_path = out / init_name
+            if init_path.is_symlink() or init_path.exists():
+                init_path.unlink()
             data.astype(np.float32).tofile(init_path)
             size_mb = init_path.stat().st_size / 1e6
             print(f"  Wrote {init_path} ({size_mb:.1f} MB)")
