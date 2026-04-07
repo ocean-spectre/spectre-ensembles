@@ -73,6 +73,6 @@
  hydrogSaltFile='S.init.bin',
  uVelInitFile='U.init.bin',
  vVelInitFile='V.init.bin',
-# checkIniTemp=.FALSE.
-# checkIniSalt=.FALSE.
+ checkIniTemp=.FALSE.,
+ checkIniSalt=.FALSE.,
  &end

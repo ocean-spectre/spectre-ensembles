@@ -123,9 +123,7 @@ def pickup_to_init(pickup_prefix: str, output_dir: str, nx: int, ny: int, nr: in
             init_path = out / init_name
             if init_path.is_symlink() or init_path.exists():
                 init_path.unlink()
-            data32 = data.astype(">f4")
-            data32[~np.isfinite(data32)] = 0.0
-            data32.tofile(init_path)
+            data.astype(">f4").tofile(init_path)
             size_mb = init_path.stat().st_size / 1e6
             print(f"  Wrote {init_path} ({size_mb:.1f} MB)")
 
