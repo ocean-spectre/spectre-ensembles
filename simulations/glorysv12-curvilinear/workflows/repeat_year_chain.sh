@@ -20,13 +20,16 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 SIMULATION_DIR=$(dirname "$SCRIPT_DIR")
 
 N_RUNS=50
+START_RUN=1
 EXPERIMENT="repeat-year-50"
 DRY_RUN=false
 
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=true
-    echo "[DRY RUN] Will print sbatch commands without submitting."
-fi
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true; echo "[DRY RUN] Will print sbatch commands without submitting." ;;
+        --start=*) START_RUN="${arg#--start=}" ;;
+    esac
+done
 
 EXPERIMENT_DIR="${SIMULATION_DIR}/${EXPERIMENT}"
 mkdir -p "${EXPERIMENT_DIR}"
@@ -38,7 +41,7 @@ echo "======================================="
 
 PREV_JOB_ID=""
 
-for i in $(seq 1 $N_RUNS); do
+for i in $(seq $START_RUN $N_RUNS); do
     RUN_NUM=$(printf "%03d" $i)
     PREV_RUN_NUM=""
     if [[ $i -gt 1 ]]; then

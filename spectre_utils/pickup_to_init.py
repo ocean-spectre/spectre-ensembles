@@ -35,7 +35,7 @@ def parse_pickup_meta(meta_path: Path) -> dict:
 
     # Extract precision
     prec_match = re.search(r"dataprec\s*=\s*\[\s*'(\w+)'\s*\]", text)
-    dtype = np.float64 if prec_match and "64" in prec_match.group(1) else np.float32
+    dtype = np.dtype(">f8") if prec_match and "64" in prec_match.group(1) else np.dtype(">f4")
 
     # Extract number of records
     nrec_match = re.search(r"nrecords\s*=\s*\[\s*(\d+)\s*\]", text)
@@ -123,7 +123,9 @@ def pickup_to_init(pickup_prefix: str, output_dir: str, nx: int, ny: int, nr: in
             init_path = out / init_name
             if init_path.is_symlink() or init_path.exists():
                 init_path.unlink()
-            data.astype(np.float32).tofile(init_path)
+            data32 = data.astype(">f4")
+            data32[~np.isfinite(data32)] = 0.0
+            data32.tofile(init_path)
             size_mb = init_path.stat().st_size / 1e6
             print(f"  Wrote {init_path} ({size_mb:.1f} MB)")
 
