@@ -28,6 +28,8 @@ for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY_RUN=true; echo "[DRY RUN] Will print sbatch commands without submitting." ;;
         --start=*) START_RUN="${arg#--start=}" ;;
+        --n-runs=*) N_RUNS="${arg#--n-runs=}" ;;
+        --experiment=*) EXPERIMENT="${arg#--experiment=}" ;;
     esac
 done
 

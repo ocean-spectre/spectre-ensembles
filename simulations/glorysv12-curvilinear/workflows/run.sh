@@ -35,34 +35,23 @@ mkdir -p ${RUN_DIR}
 echo ${SLURM_JOB_ID} > ${RUN_DIR}/slurm_job_id
 
 ###############################################################################
-# Sync namelist files (data*) from beegfs to local input directory
-# This ensures the local disk copy always has the latest configuration
-###############################################################################
-echo "-------------------------------------"
-echo "  > Syncing namelist files to local input directory..."
-cp -v ${SIMULATION_DIR}/input/data* ${SIMULATION_INPUT_DIR}/ 2>/dev/null
-cp -v ${SIMULATION_DIR}/input/eedata ${SIMULATION_INPUT_DIR}/ 2>/dev/null
-echo "  > Done syncing."
-echo "-------------------------------------"
-
-###############################################################################
 # Set up run directory
 ###############################################################################
-if [[ ! -d "$RUN_DIR" ]]; then
+#if [[ ! -d "$RUN_DIR" ]]; then
   echo "-------------------------------------"
   echo "  > Directory $RUN_DIR does not exist. Setting up the run directory now..."
   echo ""
   srun --ntasks=1 \
        --mpi=pmix \
        --container-image=$MITGCM_BASE_IMG \
-       --container-mounts=$SIMULATION_INPUT_DIR:/input,$SIMULATION_DIR:/workspace:rw \
+       --container-mounts=$SIMULATION_DIR:/workspace:rw \
        --container-env=RUN_DIR \
        /bin/bash -c /workspace/workflows/run_setup.sh
   echo ""
   echo "  > Done setting up the run directory!"
   echo ""
   echo "-------------------------------------"
-fi
+#fi
 
 ###############################################################################
 # Launch mitgcm under enroot container
@@ -70,6 +59,6 @@ fi
 srun --mpi=pmix \
      --cpu-bind=cores \
      --container-image=$MITGCM_BASE_IMG \
-     --container-mounts=$SIMULATION_INPUT_DIR:/input,$SIMULATION_DIR:/workspace:rw \
+     --container-mounts=$SIMULATION_DIR:/workspace:rw \
      --container-env=RUN_DIR \
      /bin/bash -c /workspace/workflows/run_worker.sh

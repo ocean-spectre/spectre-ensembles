@@ -95,6 +95,16 @@ def convert_one(data_path, meta, run_dir, Nx, Ny, Nr, nPx, nPy, deltaT, start_da
         global_fields[fname] = {"data": raw[offset:offset + fld_size].reshape(shape), "is_3d": fld_3d}
         offset += fld_size
 
+    # Validate: the first field should have a reasonable number of non-zero values
+    # (at least 30% — ocean covers ~80% of the domain). If mostly zeros, the
+    # binary was likely read before MITgcm finished flushing to disk.
+    first_field = list(global_fields.values())[0]["data"] if global_fields else None
+    if first_field is not None:
+        nonzero_frac = np.count_nonzero(first_field) / first_field.size
+        if nonzero_frac < 0.3:
+            print(f"  SKIP {basename}: only {nonzero_frac:.1%} non-zero — likely incomplete flush")
+            return False
+
     # Get tile layout from grid files
     tile_info = {}
     for d in sorted(glob.glob(os.path.join(run_dir, "mnc_*_*/"))):
@@ -152,12 +162,22 @@ def convert_one(data_path, meta, run_dir, Nx, Ny, Nr, nPx, nPy, deltaT, start_da
     return written > 0
 
 
-def find_unconverted(run_dir, prefixes=("state3D", "state2D", "Thermo")):
+def find_unconverted(run_dir, prefixes=("state3D", "state2D", "Thermo"), min_age_s=120):
+    """Find binary diagnostics files ready for conversion.
+
+    Only returns files older than min_age_s seconds to ensure MITgcm
+    has finished writing and flushing to disk.
+    """
+    import time as _time
+    now = _time.time()
     results = []
     for prefix in prefixes:
         for meta_path in sorted(glob.glob(os.path.join(run_dir, f"{prefix}.*.meta"))):
             data_path = meta_path.replace(".meta", ".data")
             if not os.path.exists(data_path):
+                continue
+            # Skip files that are too recent (may still be written)
+            if now - os.path.getmtime(data_path) < min_age_s:
                 continue
             iter_str = os.path.basename(meta_path).split(".")[1]
             mnc_dirs = glob.glob(os.path.join(run_dir, "mnc_*_0001/"))

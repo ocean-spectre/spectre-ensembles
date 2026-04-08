@@ -119,14 +119,32 @@ def stitch_field_2d(run_dir, file_prefix, timestep_str, var_name, layout,
     return global_field
 
 
-def find_diag_timesteps(run_dir, prefix="state3D"):
-    timesteps = set()
+def find_diag_timesteps(run_dir, prefix="state3D", n_tiles=64):
+    """Find timesteps where all tiles have been converted to NetCDF."""
+    # Count how many tile directories exist
+    mnc_dirs = glob.glob(os.path.join(run_dir, "mnc_*_*/"))
+    if not mnc_dirs:
+        return []
+    n_dirs = len(mnc_dirs)
+
+    # Find candidate timesteps from one tile dir
+    candidates = set()
     for d in glob.glob(os.path.join(run_dir, "mnc_*_0001/")):
         for f in glob.glob(os.path.join(d, f"{prefix}.*.t*.nc")):
             m = re.search(rf"{prefix}\.(\d{{10}})\.t", f)
             if m:
-                timesteps.add(m.group(1))
-    return sorted(timesteps)
+                candidates.add(m.group(1))
+
+    # Verify all tiles are present for each candidate
+    ready = []
+    for ts in sorted(candidates):
+        count = 0
+        for d in mnc_dirs:
+            if glob.glob(os.path.join(d, f"{prefix}.{ts}.t*.nc")):
+                count += 1
+        if count >= n_dirs:
+            ready.append(ts)
+    return ready
 
 
 # ---------------------------------------------------------------------------
@@ -198,17 +216,32 @@ def process_run(run_dir, xC, yC, plotted_cache, nPx, nPy, sNx, sNy, deltaT, star
         model_seconds = iter_num * deltaT
         model_date = (t0 + timedelta(seconds=model_seconds)).strftime("%Y-%m-%d")
 
+        # Minimum fraction of valid (non-zero, non-NaN) ocean points
+        # to consider the stitched field complete. If below this, skip
+        # and retry on the next poll cycle.
+        MIN_VALID_FRAC = 0.5
+        n_total = Nx * Ny
+        skip_ts = False
+
         # SST, SSS
         for var, field_name, k in [("THETA", "SST", 0), ("SALT", "SSS", 0)]:
             out = os.path.join(plots_dir, f"{field_name}_{ts}.png")
             if not os.path.exists(out):
                 data = stitch_field_2d(run_dir, "state3D", ts, var, layout,
                                         nPx, nPy, sNx, sNy, k=k)
+                n_valid = np.sum((data != 0) & ~np.isnan(data))
+                if n_valid < n_total * MIN_VALID_FRAC:
+                    print(f"  [{run_name}] {field_name} {ts}: only {n_valid}/{n_total} valid — skipping, will retry")
+                    skip_ts = True
+                    break
                 try:
                     plot_field(data, field_name, xC, yC, model_date, out)
                     new_count += 1
                 except Exception as e:
                     print(f"  [{run_name}] Error plotting {field_name}: {e}")
+
+        if skip_ts:
+            continue  # don't mark as plotted — retry next cycle
 
         # KE
         out = os.path.join(plots_dir, f"KE_{ts}.png")
@@ -237,7 +270,10 @@ def process_run(run_dir, xC, yC, plotted_cache, nPx, nPy, sNx, sNy, deltaT, star
                 except Exception as e:
                     print(f"  [{run_name}] Error plotting SSH: {e}")
 
-        plotted.add(ts)
+        # Only mark as plotted if all expected files exist
+        expected = [f"{fn}_{ts}.png" for fn in ["SST", "SSS", "KE", "SSH"]]
+        if all(os.path.exists(os.path.join(plots_dir, e)) for e in expected):
+            plotted.add(ts)
 
     return new_count
 

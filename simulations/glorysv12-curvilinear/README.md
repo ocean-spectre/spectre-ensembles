@@ -111,6 +111,40 @@ first launch, then submits the MPI job. The run directory is controlled by
 `RUN_DIR` in `run.sh` (default: `demo/`).
 
 
+## Frazil ice and freezing
+
+This simulation enables the MITgcm frazil ice package (`useFRAZIL=.TRUE.` in
+`data.pkg`) together with the `allowFreezing=.TRUE.` flag in `data` PARM01.
+
+**Intention.** In a regional ocean model without a coupled sea-ice model, surface
+heat loss during winter can cool seawater below its local freezing point (a
+function of salinity and pressure). Without intervention the model would produce
+unphysical sub-freezing temperatures, which destabilize the equation of state,
+generate spurious convection, and can ultimately blow up the simulation.
+
+**Physical mechanism.** When the frazil package is active, MITgcm checks the
+in-situ temperature in every cell at the end of each timestep against the local
+freezing point, T_f(S, p). If the temperature falls below T_f, the excess
+cooling (T_f - T) is converted into frazil ice formation: the cell temperature
+is reset to T_f and the latent heat required to form the implied ice mass is
+removed from the ocean heat budget. In effect, the ocean "pays" for the phase
+change with latent heat rather than continuing to cool. The `allowFreezing` flag
+works in concert by permitting the nonlinear free-surface and vertical mixing
+schemes to recognize the freezing-point floor, preventing advection or diffusion
+from re-introducing sub-freezing temperatures between frazil corrections.
+
+**Impact on the simulation.**
+- Prevents numerical blow-ups in winter, particularly on the Labrador shelf and
+  in the subpolar gyre where strong surface cooling and fresh meltwater create
+  conditions favorable for freezing.
+- Adds an implicit latent heat sink wherever ice would form, damping the winter
+  mixed-layer deepening that would otherwise be overestimated.
+- Does not simulate ice dynamics, thickness, or transport — it is a
+  thermodynamic clamp only. Any scientific analysis of ice-affected regions
+  should note that frazil formation acts as a sub-grid-scale parameterization of
+  ice-ocean thermodynamics, not a prognostic sea-ice model.
+
+
 ## Data sources
 
 | Dataset | Access | Variables |

@@ -55,6 +55,21 @@ srun --ntasks=1 \
 echo "  > Symlinks created."
 
 ###############################################################################
+# Step 1b: Copy experiment-level override files (e.g. data.exf) into run dir
+###############################################################################
+OVERRIDE_DIR="${SIMULATION_DIR}/${EXPERIMENT}"
+if compgen -G "${OVERRIDE_DIR}/data*" > /dev/null 2>&1; then
+    echo "--- Applying overrides from ${EXPERIMENT}/ ---"
+    for f in "${OVERRIDE_DIR}"/data*; do
+        fname=$(basename "$f")
+        dest="${SIMULATION_DIR}/${RUN_DIR}/${fname}"
+        rm -f "$dest"
+        cp "$f" "$dest"
+        echo "  > Copied override: ${fname}"
+    done
+fi
+
+###############################################################################
 # Step 2: For runs after 001, convert previous pickup to init files
 ###############################################################################
 if [[ -n "${PREV_RUN_NUM:-}" ]]; then
