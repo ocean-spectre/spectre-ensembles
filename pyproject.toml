@@ -33,11 +33,17 @@ dependencies = [
   "xarray==2025.6.1",
   "xgcm==0.8.1",
   "zarr==3.0.8",
-  "MetPy==1.7.1"
+  "MetPy==1.7.1",
+  "claude-agent-sdk",
+  "discord.py>=2.3.0",
+  "anyio>=4.0.0",
 ]
 [project.urls]
 Homepage = "https://github.com/ocean-spectre/spectra-150-ensembles"
 Issues = "https://github.com/fluidnumerics/spectre_utils/issues"
 
+[project.scripts]
+spectre-agents = "spectre_agents.__main__:cli"
+
 [tool.setuptools]
-packages = ["spectre_utils"]
+packages = ["spectre_utils", "spectre_agents", "spectre_agents.tools", "spectre_agents.agents", "spectre_agents.discord_bot"]
