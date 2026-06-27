@@ -20,7 +20,7 @@ from spectre_utils import common
 import yaml
 from metpy.calc import specific_humidity_from_dewpoint
 from metpy.units import units
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
@@ -168,7 +168,13 @@ def main():
     simulation_input_dir = os.path.join(simulation_directory, "input")
 
     t1 = datetime.strptime(config["domain"]["time"]["start"], "%Y-%m-%d")
-    t2 = datetime.strptime(config["domain"]["time"]["end"], "%Y-%m-%d")
+    # domain.time.end is a date (midnight). xarray's .sel(slice(...)) is
+    # inclusive on both ends, so slicing to the bare date keeps only the
+    # 00:00 record of the final day and drops the remaining 3-hourly records
+    # (03:00..21:00) -- a 21-hour gap at the tail of the forcing. Extend the
+    # upper bound to the end of the final day so all 8 records are written and
+    # EXF has a record bounding the model's last timestep.
+    t2 = datetime.strptime(config["domain"]["time"]["end"], "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
 
     # --- Model grid ---
     npx = config["domain"]["mpi"]["npx"]

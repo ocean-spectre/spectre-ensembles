@@ -52,14 +52,18 @@ atmosphere:
       scale_factor: 2.7778E-04
     - era_name: "evaporation"
       mitgcm_name: "evap"
-      scale_factor: 2.7778E-04
+      # ERA5 'evaporation' is negative for water leaving the surface (ECMWF
+      # downward-positive convention). MITgcm EXF expects evap > 0 for
+      # evaporation (water leaving ocean, salinity up). Negative scale flips
+      # the sign; magnitude is 1/3600 s to convert m/hr accumulation to m/s.
+      scale_factor: -2.7778E-04
     - era_name: "surface_pressure"
       mitgcm_name: "sp"
   computed_variables:
     - mitgcm_name: "aqh"
       era_name: "q"
       function: "specific_humdity_from_dewpoint"
-  years: [2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017]
+  years: [2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026]
   prefix: "era5"
 
 domain:
@@ -81,7 +85,7 @@ domain:
     max: 10000.0
   time:
     start: "2002-07-01"
-    end: "2017-06-30"
+    end: "2026-01-01"
 
 simulation:
   jobs:

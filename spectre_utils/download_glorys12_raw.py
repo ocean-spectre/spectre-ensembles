@@ -3,9 +3,25 @@ import pandas as pd
 import xarray as xr
 import yaml
 import os
+import requests
+from netrc import netrc as Netrc
 from spectre_utils import common
 import xgcm
 import matplotlib.pyplot as plt
+
+
+def make_mercator_session():
+    """Return a requests.Session with HTTPBasic auth for tds.mercator-ocean.fr
+    taken from ~/.netrc. Returns an unauthenticated session if no entry exists."""
+    sess = requests.Session()
+    try:
+        auths = Netrc().authenticators('tds.mercator-ocean.fr')
+    except (FileNotFoundError, OSError):
+        auths = None
+    if auths:
+        user, _, password = auths
+        sess.auth = (user, password)
+    return sess
 
 
 staticsmap = {
@@ -24,13 +40,13 @@ datamap = {
         'KZ': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-gridKZ',
         'grid2D': 'dap2://tds.mercator-ocean.fr/thredds/dodsC/glorys12v1-daily-grid2D',
     }
-def get_glorys12_statics(xmin, xmax, ymin, ymax, var):
+def get_glorys12_statics(xmin, xmax, ymin, ymax, var, session=None):
     import xarray as xr
 
     datasets = {}
     url = staticsmap[var]
     print(f"Downloading from {url}")
-    ds = xr.open_dataset(url,engine='pydap')
+    ds = xr.open_dataset(url, engine='pydap', session=session)
 
     region = (ds.nav_lon > xmin) & (ds.nav_lon < xmax) & (ds.nav_lat > ymin) & (ds.nav_lat < ymax)
     indices = np.argwhere(region.values)
@@ -47,11 +63,11 @@ def get_glorys12_statics(xmin, xmax, ymin, ymax, var):
     print(ds_subdomain)
     return ds_subdomain
 
-def get_glorys12_data(daterange, xmin, xmax, ymin, ymax, var):
+def get_glorys12_data(daterange, xmin, xmax, ymin, ymax, var, session=None):
     import xarray as xr
 
     datasets = {}
-    ds = xr.open_dataset(datamap[var],engine='pydap')
+    ds = xr.open_dataset(datamap[var], engine='pydap', session=session)
 
     region = (ds.nav_lon > xmin) & (ds.nav_lon < xmax) & (ds.nav_lat > ymin) & (ds.nav_lat < ymax)
     indices = np.argwhere(region.values)
@@ -93,6 +109,8 @@ def main():
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
 
+    session = make_mercator_session()
+
     #for var in staticsmap.keys():
     #  ds = get_glorys12_statics(
     #      xmin=min_long,
@@ -123,7 +141,8 @@ def main():
             xmax=max_long,
             ymin=min_lat,
             ymax=max_lat,
-            var=var)
+            var=var,
+            session=session)
 
         ds.to_netcdf(os.path.join(working_directory, f"{dataset_prefix}_{var}_glorys12_raw.{chunk}.nc"))
 
